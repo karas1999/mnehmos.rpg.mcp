@@ -1,5 +1,7 @@
 # mnehmos.rpg.mcp - Knowledge Base Document
 
+> **Legacy upstream snapshot:** this document captures an older point-in-time view and contains stale counts and integration assumptions. For the current state and direction of this fork, use `PROJECT.md`. Verify implementation details against current code before relying on this file.
+
 ## Quick Reference
 
 | Property | Value |

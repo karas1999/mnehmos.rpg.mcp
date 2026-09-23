@@ -4,12 +4,14 @@
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)]()
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-2214%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-2278%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/MCP%20tools-36-blue.svg)]()
 
 **A rules-enforced RPG backend that turns any LLM into a game master who can't cheat.**
 
 ---
+
+> **Fork development note:** this fork is being adapted for a ChatGPT Chat-mode solo RPG backed by Karas Home Gateway. The upstream engine remains the mechanical foundation. See [PROJECT.md](PROJECT.md) for the fork's current direction, status, and handoff state.
 
 ## What Is This? (Start Here)
 

@@ -2,9 +2,9 @@
 
 ## This Repository
 
-The reference backend game engine. **35 MCP tools** (31 consolidated action-routed + 4 meta/event) for complete RPG mechanics, including LLM-driven NPCs via `agent_manage` and the Operator's constraint-perception lens via `perception_manage`.
+The reference backend game engine. **36 MCP tools** (31 consolidated action-routed + 5 meta/event) for complete RPG mechanics, including LLM-driven NPCs via `agent_manage` and the Operator's constraint-perception lens via `perception_manage`.
 **Philosophy:** "LLM describes, engine validates" - Database is source of truth.
-**Status:** Alpha - 2216 tests passing (7 skipped), 141 test files, MCP Protocol fully integrated
+**Status:** Alpha - 2278 tests passing (7 skipped), 148 passing test files (1 skipped), MCP Protocol fully integrated
 
 ## Who consumes this engine
 
