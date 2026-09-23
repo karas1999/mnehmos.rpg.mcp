@@ -50,3 +50,12 @@ provider while the RPG project remains a standalone MCP server. The targeted
 single-user HTTP tests pass, and the full suite reports 2280 tests passed with
 7 skipped.
 
+The integration was also validated through an isolated Karas Home Gateway
+instance. The Gateway discovered the mapped RPG capabilities, executed a seeded
+dice roll through `rpg.math_manage`, and created a persistent test character
+through `rpg.character_manage`.
+
+The home machine's local Gateway/Hub configuration has been staged with an RPG
+provider and launch recipe. The live Gateway was intentionally left running
+unchanged so the active development connection would not be interrupted.
+

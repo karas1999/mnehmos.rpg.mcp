@@ -32,7 +32,9 @@ The engine should remain the authoritative source of mechanical truth while Chat
 - Streamable HTTP, stdio, TCP, Unix socket, and WebSocket transports already exist upstream.
 - SQLite-backed persistence and per-campaign HTTP database support already exist upstream.
 - The repository includes a complete Bastion campaign data set and a bespoke `scripts/seed-bastion.ts` importer. It demonstrates that rich campaign content can be materialized into the engine, but it is not a generic campaign-module loader.
-- The upstream HTTP transport is being extended with an explicit single-user mode so Karas Home Gateway can connect over localhost MCP HTTP without tenant headers.
+- The HTTP transport now supports an explicit single-user mode so Karas Home Gateway can connect over localhost MCP HTTP without tenant headers.
+- The integration was exercised end to end through an isolated Gateway instance: Gateway discovery succeeded, `rpg.math_manage` executed a deterministic dice roll, and `rpg.character_manage` persisted a test character through the single-user SQLite database.
+- The home node's machine-local Gateway and Service Hub configurations now include the RPG provider and launch recipe. They are staged as a pending configuration change and have not yet replaced the currently running Gateway process.
 - No generic Campaign Loader has been implemented yet.
 - Current verification on 2026-09-23: `npm run build` and the full Vitest suite succeeded with 149 test files passed, 1 skipped; 2280 tests passed, 7 skipped.
 
@@ -88,7 +90,7 @@ Campaign source material should eventually flow through a generic Campaign Pack 
 
 ## Next
 
-1. Add the RPG provider to Karas Home Gateway configuration and validate localhost MCP HTTP end to end.
+1. Apply/restart the home Gateway configuration and verify the RPG tools through the normal Karas Home Gateway connection.
 2. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
 3. Design a generic Campaign Pack schema and loader, using Bastion's bootstrap/seeder as evidence rather than as the final format.
 4. Establish the Karin Cloud deployment/update path after the local integration is stable.
