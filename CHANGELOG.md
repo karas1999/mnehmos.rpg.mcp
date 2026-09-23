@@ -91,3 +91,7 @@ Campaign Pack v1 is intentionally non-atomic for now: a runtime failure can
 leave partial state, but a failed import marker prevents a blind duplicate
 retry. Rollback/resume semantics remain future work.
 
+The Home Gateway and plugin were then reloaded. ChatGPT Chat discovered
+`rpg.campaign_manage` directly and successfully ran a live `validate` call
+through Karas Home Gateway into the RPG engine.
+
