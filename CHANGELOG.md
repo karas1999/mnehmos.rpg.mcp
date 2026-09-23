@@ -26,3 +26,27 @@ The fork now has a documented development boundary while preserving a clean path
 
 The inherited Bastion campaign uses a bespoke bootstrap JSON plus `scripts/seed-bastion.ts`. It is useful implementation evidence, but the fork intends to replace that campaign-specific import path with a reusable Campaign Pack / Campaign Loader design.
 
+## 2026-09-23 - Single-user HTTP Integration Path
+
+### Why
+
+Karas Home Gateway should aggregate the RPG engine without owning RPG business
+logic or requiring a second external tunnel. The RPG server should also remain
+independently usable outside the Gateway.
+
+### What
+
+- Added an explicit single-user HTTP mode for personal deployments.
+- Reused the existing single-user SQLite path instead of requiring signed
+  tenant headers.
+- Kept service-token authentication on the HTTP MCP endpoint.
+- Disabled the multi-tenant campaign-erasure route in single-user mode.
+- Preserved the existing multi-tenant HTTP behavior as the default.
+
+### Result
+
+Karas Home Gateway can consume the RPG engine as a normal localhost MCP HTTP
+provider while the RPG project remains a standalone MCP server. The targeted
+single-user HTTP tests pass, and the full suite reports 2280 tests passed with
+7 skipped.
+

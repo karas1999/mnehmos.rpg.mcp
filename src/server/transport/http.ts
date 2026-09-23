@@ -10,6 +10,13 @@ export interface HttpServerTransportOptions {
     authToken?: string;
     tenantSecret?: string;
     maxBodyBytes?: number;
+    /**
+     * Run HTTP as a personal single-user transport.
+     *
+     * Storage must be initialized with useSingleUserDatabase() before requests
+     * arrive. Tenant headers are not required and campaign erasure is disabled.
+     */
+    singleUser?: boolean;
 }
 
 const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
@@ -114,6 +121,7 @@ export async function startHttpServerTransport(
     const authToken = options.authToken ?? process.env.RPG_MCP_TRANSPORT_TOKEN;
     const tenantSecret = options.tenantSecret ?? process.env.RPG_MCP_TENANT_SECRET;
     const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+    const singleUser = options.singleUser ?? false;
 
     // Fail closed rather than warn. Serving /mcp unauthenticated exposes every
     // campaign in the database to anyone who finds the URL; a service that
@@ -123,7 +131,7 @@ export async function startHttpServerTransport(
             'RPG_MCP_TRANSPORT_TOKEN is not set. Refusing to start an unauthenticated /mcp endpoint.'
         );
     }
-    if (!tenantSecret) {
+    if (!singleUser && !tenantSecret) {
         console.error(
             '[HTTP] WARNING: no RPG_MCP_TENANT_SECRET configured; ' +
             'tenant-scoped requests will be rejected and only tenant-agnostic meta-tools will work.'
@@ -140,6 +148,7 @@ export async function startHttpServerTransport(
                 service: 'rpg-mcp',
                 environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development',
                 transport: 'http',
+                mode: singleUser ? 'single-user' : 'multi-tenant',
                 deployment: {
                     service: process.env.RAILWAY_SERVICE_NAME || 'rpg-mcp',
                     environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development',
@@ -157,6 +166,11 @@ export async function startHttpServerTransport(
         // campaign is not a capability worth handing over. Only the web host,
         // holding the service token and a signed tenant context, can reach this.
         if (url.pathname === '/campaign') {
+            if (singleUser) {
+                res.writeHead(404, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ error: 'not_found' }));
+                return;
+            }
             if (!isAuthorized(req, authToken)) {
                 res.writeHead(401, { 'content-type': 'application/json' });
                 res.end(JSON.stringify({ error: 'unauthorized' }));
@@ -209,7 +223,9 @@ export async function startHttpServerTransport(
             return;
         }
 
-        const tenant = resolveTenant(req, tenantSecret);
+        const tenant = singleUser
+            ? ({ ok: true, context: undefined } as const)
+            : resolveTenant(req, tenantSecret);
         if (!tenant.ok) {
             // Log the precise reason; return an opaque error. Telling a caller
             // whether a token was expired vs. forged helps an attacker more

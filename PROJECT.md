@@ -32,8 +32,9 @@ The engine should remain the authoritative source of mechanical truth while Chat
 - Streamable HTTP, stdio, TCP, Unix socket, and WebSocket transports already exist upstream.
 - SQLite-backed persistence and per-campaign HTTP database support already exist upstream.
 - The repository includes a complete Bastion campaign data set and a bespoke `scripts/seed-bastion.ts` importer. It demonstrates that rich campaign content can be materialized into the engine, but it is not a generic campaign-module loader.
-- No Karas Home Gateway adapter or generic Campaign Loader has been implemented yet.
-- Baseline verified on 2026-09-23: `npm ci`, `npm run build`, and the full Vitest suite succeeded with 148 test files passed, 1 skipped; 2278 tests passed, 7 skipped.
+- The upstream HTTP transport is being extended with an explicit single-user mode so Karas Home Gateway can connect over localhost MCP HTTP without tenant headers.
+- No generic Campaign Loader has been implemented yet.
+- Current verification on 2026-09-23: `npm run build` and the full Vitest suite succeeded with 149 test files passed, 1 skipped; 2280 tests passed, 7 skipped.
 
 ## Architecture
 
@@ -72,6 +73,8 @@ Campaign source material should eventually flow through a generic Campaign Pack 
 - **Use `karas-dev` for long-lived fork work.** The fork is expected to evolve beyond a single feature.
 - **Develop primarily on the home PC and deploy to Karin Cloud.** The home PC is the development workstation; Karin Cloud is intended to be the always-on runtime.
 - **Reuse Karas Home Gateway.** Gateway already provides the connection path used by ChatGPT, so RPG functionality should integrate behind it rather than duplicate transport and tunnel infrastructure.
+- **Keep RPG independently usable.** Gateway will consume the RPG server through its existing localhost MCP HTTP adapter; the RPG project remains a complete standalone MCP server that can be published and used without Karas Home Gateway.
+- **Use single-user HTTP for personal deployment.** The personal runtime uses one explicit SQLite database and service authentication, while upstream multi-tenant HTTP remains available and unchanged by default.
 - **Keep the engine authoritative.** The inherited principle remains: the LLM describes and proposes; validated engine operations commit mechanical truth.
 - **Prefer adapters over invasive forks.** Keeping upstream engine boundaries intact makes future upstream merges cheaper.
 - **Generalize campaign loading.** Bastion's bespoke bootstrap proves the concept, but future campaigns should use a reusable loader rather than campaign-specific TypeScript seeders.
@@ -85,7 +88,7 @@ Campaign source material should eventually flow through a generic Campaign Pack 
 
 ## Next
 
-1. Inspect Karas Home Gateway's provider/tool registration model and choose the smallest integration boundary for the RPG engine.
+1. Add the RPG provider to Karas Home Gateway configuration and validate localhost MCP HTTP end to end.
 2. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
 3. Design a generic Campaign Pack schema and loader, using Bastion's bootstrap/seeder as evidence rather than as the final format.
 4. Establish the Karin Cloud deployment/update path after the local integration is stable.

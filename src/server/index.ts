@@ -243,6 +243,12 @@ async function main() {
     const index = args.indexOf(name);
     return index !== -1 ? args[index + 1] : undefined;
   };
+  const singleUserHttp =
+    transportType === 'http' &&
+    (
+      args.includes('--single-user-http') ||
+      /^(1|true|yes)$/i.test(process.env.RPG_MCP_SINGLE_USER_HTTP ?? '')
+    );
   // Only the HTTP transport is multi-tenant; it establishes a verified tenant
   // per request. Every other transport serves one local operator, so it opens a
   // single database up front. Without this, getDb() would find no tenant and
@@ -252,7 +258,7 @@ async function main() {
   // The legacy-database assertion is likewise HTTP-only: for a hosted server a
   // pre-split file means an incomplete cutover, but in single-user mode that
   // same file is simply the operator's database.
-  if (transportType === 'http') {
+  if (transportType === 'http' && !singleUserHttp) {
     assertNoLegacyDatabase();
     console.error(`[Server] Campaign databases: ${campaignDbPath('<campaign-id>')}`);
   } else {
@@ -325,8 +331,12 @@ async function main() {
       host: httpHost,
       authToken: transportToken,
       maxBodyBytes: maxMessageBytes,
+      singleUser: singleUserHttp,
     });
-    console.error(`RPG MCP Server running on HTTP ${httpHost}:${port} (POST /mcp, GET /health)`);
+    console.error(
+      `RPG MCP Server running on HTTP ${httpHost}:${port} ` +
+      `(${singleUserHttp ? 'single-user' : 'multi-tenant'}; POST /mcp, GET /health)`
+    );
   } else {
     const server = buildServer(pubsub, auditLogger);
     const transport = new StdioServerTransport();

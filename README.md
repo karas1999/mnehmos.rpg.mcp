@@ -4,7 +4,7 @@
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)]()
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-2278%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-2280%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/MCP%20tools-36-blue.svg)]()
 
 **A rules-enforced RPG backend that turns any LLM into a game master who can't cheat.**
@@ -245,6 +245,23 @@ npm test  # 2214 tests should pass
 ```
 
 Security note: pin an explicit package version in `args` to avoid unintentionally running a newly published release.
+
+### Single-user HTTP mode
+
+For a personal deployment behind a local gateway or reverse proxy, HTTP can use
+one persistent SQLite database without signed tenant headers:
+
+```bash
+RPG_MCP_TRANSPORT_TOKEN=change-me node dist/server/index.js \
+  --http --single-user-http --host 127.0.0.1 --port 3781 \
+  --db-path ./data/rpg.db
+```
+
+The same mode can be enabled with `RPG_MCP_SINGLE_USER_HTTP=true`. The
+`RPG_MCP_TRANSPORT_TOKEN` requirement still applies. In single-user mode
+`POST /mcp` uses the configured database directly, `GET /health` reports
+`mode: "single-user"`, and the multi-tenant `DELETE /campaign` route is not
+available.
 
 **Using Binary:**
 
