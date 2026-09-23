@@ -2,13 +2,15 @@
 
 ## This Repository
 
-The reference backend game engine. **36 MCP tools** (31 consolidated action-routed + 5 meta/event) for complete RPG mechanics, including LLM-driven NPCs via `agent_manage` and the Operator's constraint-perception lens via `perception_manage`.
+The reference backend game engine. **37 MCP tools** (32 consolidated action-routed + 5 meta/event) for complete RPG mechanics, including portable Campaign Pack loading via `campaign_manage`, LLM-driven NPCs via `agent_manage`, and the Operator's constraint-perception lens via `perception_manage`.
 **Philosophy:** "LLM describes, engine validates" - Database is source of truth.
-**Status:** Alpha - 2280 tests passing (7 skipped), 149 passing test files (1 skipped), MCP Protocol fully integrated
+**Status:** Alpha - 2287 tests passing (7 skipped), 151 passing test files (1 skipped), MCP Protocol fully integrated
 
 ## Who consumes this engine
 
-`rpg-mcp-live` (repo `Mnehmos/rpg-mcp-live`, local checkout `F:\Github\rpg mcp live`) is the hosted web product and the **only** active consumer. It calls this engine **over HTTP** — see its `src/reference-engine-client.ts` and `REFERENCE_ENGINE_URL`. It is not a submodule and does not vendor this code, so the two repos are deployed separately and share no build step. Changing a tool's contract here is a breaking change for that service.
+Upstream's hosted production consumer is `rpg-mcp-live` (repo `Mnehmos/rpg-mcp-live`, local checkout `F:\Github\rpg mcp live`). It calls this engine **over HTTP** — see its `src/reference-engine-client.ts` and `REFERENCE_ENGINE_URL`. It is not a submodule and does not vendor this code, so the two repos are deployed separately and share no build step. Changing an inherited tool contract here can therefore be a breaking change for that service.
+
+This fork is also consumed locally by **Karas Home Gateway** through the single-user localhost HTTP transport. Gateway owns external transport/routing; this repository remains a complete standalone MCP server.
 
 The Tauri desktop app (`mnehmos.quest-keeper.game`, "Lantern") still declares this engine as an `externalBin` sidecar, but it is **deprecated and unused** — do not treat its build or deploy steps as live.
 

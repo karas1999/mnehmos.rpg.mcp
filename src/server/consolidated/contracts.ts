@@ -45,6 +45,7 @@ const TOOL_DESCRIPTORS: Readonly<Record<string, ToolDescriptor>> = {
     agent_manage: { category: 'agent', keywords: ['agent', 'llm', 'npc', 'ai', 'persona', 'invoke', 'prompt', 'memory', 'autonomous'], capabilities: ['LLM-driven NPC minds', 'Modular prompt slices', 'Plain-text intent declarations', 'Auto-invoke on initiative'] },
     perception_manage: { category: 'meta', keywords: ['perception', 'hazard', 'control', 'safety', 'sight', 'blind-spot', 'attention', 'operator'], capabilities: ['Hierarchy-of-Controls hazard scanning', 'Attentional-capacity metering', 'Blind-spot detection (§3.5)', 'Disposition discipline'] },
     scene_manage: { category: 'narrative', keywords: ['scene', 'set_scene', 'frame', 'dm', 'narration', 'shared', 'state', 'context'], capabilities: ['DM-committed shared scenes', 'Auto-injected into agent prompts', 'Engine-side source of truth for "what is happening now"'] },
+    campaign_manage: { category: 'world', keywords: ['campaign', 'module', 'adventure', 'pack', 'import', 'load', 'scenario'], capabilities: ['Validate Campaign Packs', 'Load portable adventures', 'Resolve stable module refs to runtime entities'] },
 };
 
 type ToolShape = {

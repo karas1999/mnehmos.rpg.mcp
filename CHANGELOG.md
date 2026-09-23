@@ -59,3 +59,35 @@ The home machine's local Gateway/Hub configuration has been staged with an RPG
 provider and launch recipe. The live Gateway was intentionally left running
 unchanged so the active development connection would not be interrupted.
 
+## 2026-09-23 - Campaign Pack v1
+
+### Why
+
+The inherited Bastion campaign proves that rich adventure content can be seeded
+into the engine, but its importer is campaign-specific. New adventures should
+not require a new TypeScript seeder with hard-coded runtime UUIDs and bespoke
+mapping tables.
+
+### What
+
+- Added a portable Campaign Pack v1 schema with stable human-readable refs.
+- Added cross-reference validation before storage is mutated.
+- Added generic loading for new or existing worlds, spatial networks,
+  arbitrary room graphs, characters and starting locations, secrets, and
+  narrative notes.
+- Added duplicate-import protection using campaign seeds and durable narrative
+  import markers.
+- Added the consolidated `campaign_manage` tool with `validate` and `load`
+  actions while keeping its default MCP schema compact.
+- Added `docs/Campaign-Packs.md` with the supported format and first-version
+  limitations.
+
+### Result
+
+`npm run build` succeeds. The full suite reports 151 test files passed and 1
+skipped, with 2287 tests passed and 7 skipped.
+
+Campaign Pack v1 is intentionally non-atomic for now: a runtime failure can
+leave partial state, but a failed import marker prevents a blind duplicate
+retry. Rollback/resume semantics remain future work.
+

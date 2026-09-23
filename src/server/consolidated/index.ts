@@ -1,7 +1,7 @@
 /**
  * Consolidated Tools Index
  *
- * Exports all 31 consolidated tools for the v1.0 clean-break release.
+ * Exports all consolidated tools for the v1.0 clean-break release.
  * Each tool uses action-based routing with fuzzy matching and guiding errors.
  */
 
@@ -58,6 +58,9 @@ export { PerceptionManageTool, handlePerceptionManage } from './perception-manag
 // Batch 9 - Scene (DM-committed shared narrative state, auto-injected into agent prompts)
 export { SceneManageTool, handleSceneManage } from './scene-manage.js';
 
+// Fork extension - portable campaign modules
+export { CampaignManageTool, handleCampaignManage } from './campaign-manage.js';
+
 /**
  * Array of all consolidated tool definitions for easy iteration
  */
@@ -92,6 +95,7 @@ import { BatchManageTool, handleBatchManage } from './batch-manage.js';
 import { AgentManageTool, handleAgentManage } from './agent-manage.js';
 import { PerceptionManageTool, handlePerceptionManage } from './perception-manage.js';
 import { SceneManageTool, handleSceneManage } from './scene-manage.js';
+import { CampaignManageTool, handleCampaignManage } from './campaign-manage.js';
 import { defineToolContract } from './contracts.js';
 import type { ToolContract } from '../tool-metadata.js';
 
@@ -127,4 +131,5 @@ export const ConsolidatedTools: ToolContract[] = [
     defineToolContract(AgentManageTool, handleAgentManage),
     defineToolContract(PerceptionManageTool, handlePerceptionManage),
     defineToolContract(SceneManageTool, handleSceneManage),
+    defineToolContract(CampaignManageTool, handleCampaignManage),
 ];

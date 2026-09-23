@@ -28,15 +28,16 @@ The engine should remain the authoritative source of mechanical truth while Chat
 - Fork: `karas1999/mnehmos.rpg.mcp`.
 - `origin/main` and `upstream/main` were identical at adoption commit `8b88726`.
 - `main` is reserved for upstream synchronization; active fork development uses `karas-dev`.
-- The upstream engine currently registers 31 consolidated tools, 2 meta tools, and 3 event tools, for 36 MCP tools total.
+- Upstream provides 31 consolidated tools plus 5 meta/event tools; this fork adds `campaign_manage`, for 32 consolidated tools and 37 MCP tools total.
 - Streamable HTTP, stdio, TCP, Unix socket, and WebSocket transports already exist upstream.
 - SQLite-backed persistence and per-campaign HTTP database support already exist upstream.
 - The repository includes a complete Bastion campaign data set and a bespoke `scripts/seed-bastion.ts` importer. It demonstrates that rich campaign content can be materialized into the engine, but it is not a generic campaign-module loader.
 - The HTTP transport now supports an explicit single-user mode so Karas Home Gateway can connect over localhost MCP HTTP without tenant headers.
 - The integration was exercised end to end through an isolated Gateway instance: Gateway discovery succeeded, `rpg.math_manage` executed a deterministic dice roll, and `rpg.character_manage` persisted a test character through the single-user SQLite database.
-- The home node's machine-local Gateway and Service Hub configurations now include the RPG provider and launch recipe. They are staged as a pending configuration change and have not yet replaced the currently running Gateway process.
-- No generic Campaign Loader has been implemented yet.
-- Current verification on 2026-09-23: `npm run build` and the full Vitest suite succeeded with 149 test files passed, 1 skipped; 2280 tests passed, 7 skipped.
+- The home node is running the RPG provider through Karas Home Gateway. ChatGPT Chat has directly invoked `rpg.math_manage` through the normal plugin path.
+- Campaign Pack v1 is implemented with `campaign_manage.validate` and `campaign_manage.load`, stable source refs, world creation/existing-world modes, arbitrary spatial graph connections, characters and placement, secrets, narrative imports, and duplicate-import markers.
+- The home Gateway machine config now includes `campaign_manage -> rpg.campaign_manage`; it will become visible after the RPG/Gateway processes reload and the Home plugin refreshes its tool manifest.
+- Current verification on 2026-09-23: `npm run build` and the full Vitest suite succeeded with 151 test files passed, 1 skipped; 2287 tests passed, 7 skipped.
 
 ## Architecture
 
@@ -44,7 +45,8 @@ The engine should remain the authoritative source of mechanical truth while Chat
 
 - `src/engine/`: deterministic RPG mechanics such as combat, magic, spatial systems, world generation, and strategy.
 - `src/storage/`: SQLite storage, repositories, migrations, and tenant/campaign database handling.
-- `src/server/consolidated/`: 31 action-routed tool contracts and handlers.
+- `src/server/consolidated/`: 32 action-routed tool contracts and handlers in this fork.
+- `src/campaign/`: Campaign Pack v1 schema, validation, and materialization logic.
 - `src/server/`: MCP registration, meta/event tools, transports, and HTTP server behavior.
 - `src/agent/`: optional OpenAI/OpenRouter-backed autonomous NPC runtime.
 - `src/schema/`: Zod contracts and validation.
@@ -61,13 +63,13 @@ ChatGPT Chat mode
 Karas Home Gateway
       |
       v
-RPG adapter / compact DM tool surface
+localhost MCP HTTP provider
       |
       v
 Upstream RPG engine + SQLite campaign state
 ```
 
-Campaign source material should eventually flow through a generic Campaign Pack representation and loader before being materialized into engine entities, secrets, narrative notes, quests, locations, NPCs, and other persistent state.
+Campaign source material flows through Campaign Pack v1 before being materialized into engine worlds, locations, characters, secrets, and narrative state. Additional mechanical sections can be added as the format proves itself.
 
 ## Key Decisions
 
@@ -79,19 +81,21 @@ Campaign source material should eventually flow through a generic Campaign Pack 
 - **Use single-user HTTP for personal deployment.** The personal runtime uses one explicit SQLite database and service authentication, while upstream multi-tenant HTTP remains available and unchanged by default.
 - **Keep the engine authoritative.** The inherited principle remains: the LLM describes and proposes; validated engine operations commit mechanical truth.
 - **Prefer adapters over invasive forks.** Keeping upstream engine boundaries intact makes future upstream merges cheaper.
-- **Generalize campaign loading.** Bastion's bespoke bootstrap proves the concept, but future campaigns should use a reusable loader rather than campaign-specific TypeScript seeders.
+- **Generalize campaign loading.** Campaign Pack v1 replaces the need for a new campaign-specific TypeScript seeder for the supported core entities.
+- **Keep Campaign Pack v1 honest.** Unsupported mechanical domains stay out of the schema instead of being silently accepted and dropped.
 
 ## Known Issues
 
-- There is no generic Campaign Pack schema or loader yet.
-- The exact Gateway integration boundary and final ChatGPT-facing tool surface have not been designed.
+- Campaign Pack v1 imports are not atomic transactions. A runtime failure can leave partial state; the failed import marker blocks blind retry until the state is inspected or reset.
+- Campaign Pack v1 does not yet have dedicated sections for quests, parties, items/inventory, encounters, autonomous NPC minds, or mechanical factions.
+- The final minimal ChatGPT-DM tool surface has not been reduced yet; the Gateway currently exposes the selected RPG tool set explicitly.
 - Several inherited documents contain old point-in-time counts or architecture notes. `PROJECT.md` is the authority for this fork's current state; legacy snapshot documents should not be treated as current without verification.
 - `npm ci` currently reports 13 dependency vulnerabilities (1 low, 4 moderate, 6 high, 2 critical). They have not yet been assessed for runtime relevance or safe remediation.
 
 ## Next
 
-1. Apply/restart the home Gateway configuration and verify the RPG tools through the normal Karas Home Gateway connection.
-2. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
-3. Design a generic Campaign Pack schema and loader, using Bastion's bootstrap/seeder as evidence rather than as the final format.
+1. Reload the home RPG/Gateway processes, refresh the Home plugin, and validate `rpg.campaign_manage` through the normal ChatGPT plugin path.
+2. Compile a real small adventure into Campaign Pack v1 and run the first end-to-end playable import.
+3. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
 4. Establish the Karin Cloud deployment/update path after the local integration is stable.
 

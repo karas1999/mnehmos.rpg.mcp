@@ -4,7 +4,7 @@
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)]()
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-2280%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-2287%20passing-brightgreen.svg)]()
 [![Tools](https://img.shields.io/badge/MCP%20tools-36-blue.svg)]()
 
 **A rules-enforced RPG backend that turns any LLM into a game master who can't cheat.**
@@ -48,9 +48,9 @@ You talk to an AI (Claude, GPT, etc.) in natural language. You say things like "
 
 ## v1.0 Release (January 2026)
 
-### 81% Tool Reduction: 195 → 36 Tools (31 Consolidated + 5 Meta/Event)
+### 81% Tool Reduction: 195 → 37 Tools (32 Consolidated + 5 Meta/Event)
 
-This release consolidates 195 individual tools into **31 action-based tools** plus 5 standalone meta/event tools using:
+This fork currently exposes **32 action-based tools** plus 5 standalone meta/event tools using:
 
 - **Action enums** - Each tool handles multiple operations via an `action` parameter
 - **Fuzzy matching** - Typo-tolerant action matching with suggestions
@@ -63,13 +63,13 @@ This release consolidates 195 individual tools into **31 action-based tools** pl
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| MCP Tools | 195 | 36 | **81.5% reduction** |
-| Tests | 1,242 | 2,214 | +78% coverage |
+| MCP Tools | 195 | 37 | **81.0% reduction** |
+| Tests | 1,242 | 2,287 | +84% coverage |
 | Token overhead | ~50K | ~6-8K | **85% reduction** |
 
 ### Meta-Tools for Discovery
 
-Four standalone tools support discovery and real-time events:
+Five standalone tools support discovery and real-time events:
 
 | Tool | Purpose |
 |------|---------|
@@ -77,6 +77,7 @@ Four standalone tools support discovery and real-time events:
 | `load_tool_schema` | Load full parameter schema before first use |
 | `subscribe_to_events` | Subscribe to PubSub event topics (combat, quest, etc.) |
 | `unsubscribe_from_events` | Unsubscribe from event topics |
+| `poll_events` | Poll durable event inbox entries |
 
 ---
 
@@ -120,7 +121,7 @@ This engine implements the **Event-Driven Agentic AI Architecture**:
 
 ---
 
-## Consolidated Tools Reference (31 Tools)
+## Consolidated Tools Reference (32 Tools)
 
 ### Character & Party
 
@@ -153,6 +154,7 @@ This engine implements the **Event-Driven Agentic AI Architecture**:
 | `world_manage` | generate, get, update, list, delete | Procedural world generation |
 | `world_map` | get_overview, get_region, patch, preview | Map queries and modifications |
 | `spatial_manage` | look, generate, update, get_exits, move, list, network_create, network_get, network_list | Dungeon navigation and room networks |
+| `campaign_manage` | validate, load | Validate and load portable Campaign Pack v1 adventures |
 
 ### Quests & NPCs
 
@@ -373,7 +375,7 @@ docs/                 # White paper and LLM spatial guide
    LLMs cannot cast spells they don't know or claim damage they didn't roll.
 
 7. **Token efficiency**
-   31 consolidated tools with action routing reduce context overhead by 85%.
+   32 consolidated tools with action routing reduce context overhead by 85%.
 
 8. **Guiding errors**
    Invalid actions return suggestions, not just failures.
@@ -393,9 +395,9 @@ the consolidated contracts, and the adapter matrix is enforced by
 
 ```bash
 npm test
-# 2252 tests passing, 7 skipped
-# 148 test files
-# Coverage across all 36 tools (31 consolidated + 5 meta/event)
+# 2287 tests passing, 7 skipped
+# 151 passing test files, 1 skipped
+# Coverage across all 37 tools (32 consolidated + 5 meta/event)
 ```
 
 ---
@@ -445,6 +447,7 @@ Contributions welcome! Please:
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Development instructions
+- **[docs/Campaign-Packs.md](docs/Campaign-Packs.md)** - Portable Campaign Pack v1 format and import semantics
 - **[docs/WHITE_PAPER.md](docs/WHITE_PAPER.md)** - Design philosophy and architecture
 - **[docs/LLMSpatialGuide.md](docs/LLMSpatialGuide.md)** - LLM spatial navigation guide
 - **[docs/ADR-005-unified-ownership-architecture.md](docs/ADR-005-unified-ownership-architecture.md)** - Target ownership architecture
