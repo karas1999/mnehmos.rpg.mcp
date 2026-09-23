@@ -95,3 +95,27 @@ The Home Gateway and plugin were then reloaded. ChatGPT Chat discovered
 `rpg.campaign_manage` directly and successfully ran a live `validate` call
 through Karas Home Gateway into the RPG engine.
 
+## 2026-09-23 - First Private Campaign Loaded
+
+### Why
+
+Campaign Pack v1 needed a real adventure, not only synthetic tests, to prove
+the authoring and live-import workflow before normal play begins.
+
+### What
+
+- Added `.private/` to Git ignore rules so DM spoilers and local playtest packs
+  cannot be committed accidentally.
+- Authored the first private solo playtest campaign outside tracked source.
+- Validated the pack both against the compiled schema and through the live
+  `rpg.campaign_manage` Gateway path.
+- Performed a full disposable-database load before touching the live save.
+- Backed up the live single-user SQLite database, then loaded the campaign
+  through the normal Gateway route.
+
+### Result
+
+The private campaign loaded successfully into the live RPG database and is
+ready for player-character creation and the first session. No DM-only campaign
+content is stored in tracked project files.
+

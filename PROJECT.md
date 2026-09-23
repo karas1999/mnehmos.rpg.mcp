@@ -37,6 +37,7 @@ The engine should remain the authoritative source of mechanical truth while Chat
 - The home node is running the RPG provider through Karas Home Gateway. ChatGPT Chat has directly invoked `rpg.math_manage` through the normal plugin path.
 - Campaign Pack v1 is implemented with `campaign_manage.validate` and `campaign_manage.load`, stable source refs, world creation/existing-world modes, arbitrary spatial graph connections, characters and placement, secrets, narrative imports, and duplicate-import markers.
 - The Home plugin now exposes `rpg.campaign_manage`; ChatGPT Chat successfully called `campaign_manage.validate` through the live Karas Home Gateway/RPG chain.
+- The first private Campaign Pack playtest, `The Third Bell of Mistlamp`, has been authored under ignored `.private/` DM material, validated in a disposable SQLite database, backed up, and loaded successfully through the live Gateway into the single-user RPG database.
 - Current verification on 2026-09-23: `npm run build` and the full Vitest suite succeeded with 151 test files passed, 1 skipped; 2287 tests passed, 7 skipped.
 
 ## Architecture
@@ -94,7 +95,8 @@ Campaign source material flows through Campaign Pack v1 before being materialize
 
 ## Next
 
-1. Compile a real small adventure into Campaign Pack v1 and run the first end-to-end playable import.
-2. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
-3. Establish the Karin Cloud deployment/update path after the local integration is stable.
+1. Create the player's level-1 character and begin the first private solo playtest without exposing DM-only campaign material.
+2. Capture playtest findings that improve Campaign Pack/runtime behavior without leaking adventure spoilers into tracked docs.
+3. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
+4. Establish the Karin Cloud deployment/update path after the local integration is stable.
 
