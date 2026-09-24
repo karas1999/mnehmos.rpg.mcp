@@ -87,6 +87,17 @@ Campaign source material flows through Campaign Pack v1 before being materialize
 
 ## Known Issues
 
+### First solo playtest findings (2026-09-24)
+
+- **Rest / Hit Dice are not rules-authoritative yet.** `rest_manage` hard-codes every character's Hit Die to d8. It also does not persist available/spent Hit Dice, so a level-1 character can currently request more Hit Dice than they actually have. Long rest therefore cannot correctly restore spent Hit Dice either. The fix should derive die size from the character's source-backed class and persist Hit Dice availability across rests/sessions.
+- **Starter armor is granted but not equipped.** Character creation computes naked AC before provisioning, then grants starting armor without equipping it or recalculating AC. The first Ranger therefore spawned with Scale Mail in inventory but AC 13 instead of AC 16. Prefer deterministic auto-equip of defensive starting gear (armor, and shield when unambiguous) with authoritative AC recomputation; leave weapon-hand choices explicit.
+- **Some provisioned starter items are not canonical/usable.** `Torches x10` currently becomes a generic plural `Torches` item, while the light-source rules recognize a canonical/singular Torch. During play this made the Ranger's starter torches unusable until they were replaced with the source-backed SRD Torch. Starting-equipment aliases/materialization need to preserve usable item mechanics.
+- **Combat bonus-action attacks are missing.** `combat_action.attack` always validates and commits an Action, so a legal two-weapon off-hand Bonus Action attack is rejected after the main-hand attack. The combat API needs an authoritative two-weapon/off-hand path that consumes the Bonus Action and applies the correct damage modifier rules.
+- **Help / Dodge / Ready are currently descriptive rather than authoritative.** In `combat_action`, these actions return text but do not commit action economy or persist their mechanical effects. In the playtest, Lyra's Help did not actually grant advantage to Dan's next attack. These actions need engine state, consumption/expiry semantics, and tests that verify the later roll is affected.
+- **Nonlethal melee knockouts are not modeled.** There is no attack parameter/engine path for the 5e rule that a melee attack reducing a creature to 0 HP may knock it unconscious and stable instead of leaving normal 0-HP/death-save semantics. The first playtest required a manual condition/state bridge.
+- **Character updates can silently discard unsupported fields.** `character_manage.create` accepts `behavior`, but `character_manage.update` does not; Zod strips the unknown field and reports success. This caused an attempted persistent Ranger-note update to become a no-op. Add the missing mutable field(s) and/or return a guiding error for unsupported update keys instead of silently succeeding.
+- **Level-1 class choices are not structured on the character.** Ranger `Favored Enemy` and `Natural Explorer` have no durable character fields, so the playtest had to store them as a narrative rule note. A generic source-backed feature-choice representation is preferable to adding bespoke columns for every class.
+
 - Campaign Pack v1 imports are not atomic transactions. A runtime failure can leave partial state; the failed import marker blocks blind retry until the state is inspected or reset.
 - Campaign Pack v1 does not yet have dedicated sections for quests, parties, items/inventory, encounters, autonomous NPC minds, or mechanical factions.
 - The final minimal ChatGPT-DM tool surface has not been reduced yet; the Gateway currently exposes the selected RPG tool set explicitly.
@@ -95,8 +106,10 @@ Campaign source material flows through Campaign Pack v1 before being materialize
 
 ## Next
 
-1. Create the player's level-1 character and begin the first private solo playtest without exposing DM-only campaign material.
-2. Capture playtest findings that improve Campaign Pack/runtime behavior without leaking adventure spoilers into tracked docs.
-3. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
-4. Establish the Karin Cloud deployment/update path after the local integration is stable.
+1. Fix rest correctness first: class-backed Hit Die size plus persistent Hit Dice spending/recovery.
+2. Fix combat action economy used by the playtest: authoritative Help advantage, legal two-weapon Bonus Action attack, and nonlethal melee knockout semantics.
+3. Fix character-creation/runtime integrity: auto-equip defensive starter gear and canonicalize usable starter items such as Torches.
+4. Harden character persistence: avoid silent update no-ops and add a durable representation for class feature choices such as Ranger Favored Enemy / Natural Explorer.
+5. Resume the private playtest after the high-impact mechanical fixes, then capture any new engine findings without adding campaign spoilers to tracked docs.
+6. Define the first compact ChatGPT-DM tool surface exposed by Gateway, then establish the Karin Cloud deployment/update path.
 
