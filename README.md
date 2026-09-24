@@ -11,7 +11,7 @@
 
 ---
 
-> **Fork development note:** this fork is being adapted for a ChatGPT Chat-mode solo RPG backed by Karas Home Gateway. The upstream engine remains the mechanical foundation. See [PROJECT.md](PROJECT.md) for the fork's current direction, status, and handoff state.
+> **Fork development note:** this fork is being adapted for a ChatGPT Chat-mode solo RPG with an always-on Karin Cloud Gateway runtime and a Home development/rollback node. The upstream engine remains the mechanical foundation. See [PROJECT.md](PROJECT.md) for the fork's current direction, status, and handoff state.
 
 ## What Is This? (Start Here)
 

@@ -10,7 +10,7 @@ The reference backend game engine. **37 MCP tools** (32 consolidated action-rout
 
 Upstream's hosted production consumer is `rpg-mcp-live` (repo `Mnehmos/rpg-mcp-live`, local checkout `F:\Github\rpg mcp live`). It calls this engine **over HTTP** — see its `src/reference-engine-client.ts` and `REFERENCE_ENGINE_URL`. It is not a submodule and does not vendor this code, so the two repos are deployed separately and share no build step. Changing an inherited tool contract here can therefore be a breaking change for that service.
 
-This fork is also consumed locally by **Karas Home Gateway** through the single-user localhost HTTP transport. Gateway owns external transport/routing; this repository remains a complete standalone MCP server.
+This fork is also consumed by the node-local Gateway through the single-user localhost HTTP transport. **Karin Cloud Gateway** is the always-on runtime path; **Karas Home Gateway** remains the development/rollback path. Gateway owns external transport/routing; this repository remains a complete standalone MCP server.
 
 The Tauri desktop app (`mnehmos.quest-keeper.game`, "Lantern") still declares this engine as an `externalBin` sidecar, but it is **deprecated and unused** — do not treat its build or deploy steps as live.
 

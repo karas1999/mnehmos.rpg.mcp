@@ -2,7 +2,7 @@
 
 ## Goal
 
-Adapt `mnehmos.rpg.mcp` into the persistent rules and world-state backend for a solo RPG experience where ChatGPT Chat mode acts as the DM through Karas Home Gateway.
+Adapt `mnehmos.rpg.mcp` into the persistent rules and world-state backend for a solo RPG experience where ChatGPT Chat mode acts as the DM through the Karin Cloud Gateway, with the Home node retained for development and rollback.
 
 The engine should remain the authoritative source of mechanical truth while ChatGPT handles narration, roleplay, interpretation, and pacing.
 
@@ -40,6 +40,9 @@ The engine should remain the authoritative source of mechanical truth while Chat
 - The first private Campaign Pack playtest, `The Third Bell of Mistlamp`, has been authored under ignored `.private/` DM material, validated in a disposable SQLite database, backed up, and loaded successfully through the live Gateway into the single-user RPG database.
 - The first solo playtest drove a rules-hardening pass: class-backed persistent Hit Dice, authoritative combat Help/Dodge/Ready effects, legal off-hand Bonus Action attacks, nonlethal melee knockouts, starter armor auto-equip/AC calculation, canonical starter consumables/light sources, strict character updates, and durable generic `featureChoices` are implemented.
 - Current verification on 2026-09-24: `npm run build` and the full Vitest suite succeeded with 151 test files passed, 1 skipped; 2302 tests passed, 7 skipped.
+- The verified `karas-dev` build is deployed on Karin Cloud. `karin-rpg.service` runs the independent RPG MCP server in single-user HTTP mode on `127.0.0.1:3781`, using the migrated live SQLite save at `/home/karin/data/rpg/rpg-mcp.db`.
+- The private first-playtest Campaign Pack material is present only under the ignored cloud `.private/` tree; the migrated SQLite database passed `PRAGMA integrity_check`.
+- Karin Cloud Gateway now exposes the RPG provider through the same 35 `rpg.*` mappings used on Home. Gateway readiness reports DevSpace, Browser Bridge, and RPG healthy, and a local MCP smoke test successfully read the migrated player state through `rpg.character_manage`.
 
 ## Architecture
 
@@ -62,7 +65,7 @@ The intended runtime shape is:
 ChatGPT Chat mode
       |
       v
-Karas Home Gateway
+Karin Cloud Gateway
       |
       v
 localhost MCP HTTP provider
@@ -71,6 +74,8 @@ localhost MCP HTTP provider
 Upstream RPG engine + SQLite campaign state
 ```
 
+The Home checkout remains the primary development/rollback node, but normal campaign play no longer requires the Home PC to stay powered on.
+
 Campaign source material flows through Campaign Pack v1 before being materialized into engine worlds, locations, characters, secrets, and narrative state. Additional mechanical sections can be added as the format proves itself.
 
 ## Key Decisions
@@ -78,7 +83,7 @@ Campaign source material flows through Campaign Pack v1 before being materialize
 - **Keep `main` close to upstream.** This minimizes friction when pulling future fixes and features from Mnehmos.
 - **Use `karas-dev` for long-lived fork work.** The fork is expected to evolve beyond a single feature.
 - **Develop primarily on the home PC and deploy to Karin Cloud.** The home PC is the development workstation; Karin Cloud is intended to be the always-on runtime.
-- **Reuse Karas Home Gateway.** Gateway already provides the connection path used by ChatGPT, so RPG functionality should integrate behind it rather than duplicate transport and tunnel infrastructure.
+- **Reuse the existing Gateway architecture.** Karin Cloud Gateway is the always-on runtime connection used by ChatGPT; the Home Gateway remains useful for development and rollback. RPG functionality stays behind the node-local Gateway instead of duplicating transport and tunnel infrastructure.
 - **Keep RPG independently usable.** Gateway will consume the RPG server through its existing localhost MCP HTTP adapter; the RPG project remains a complete standalone MCP server that can be published and used without Karas Home Gateway.
 - **Use single-user HTTP for personal deployment.** The personal runtime uses one explicit SQLite database and service authentication, while upstream multi-tenant HTTP remains available and unchanged by default.
 - **Keep the engine authoritative.** The inherited principle remains: the LLM describes and proposes; validated engine operations commit mechanical truth.
@@ -96,9 +101,8 @@ Campaign source material flows through Campaign Pack v1 before being materialize
 
 ## Next
 
-1. Deploy the verified rules-hardening build, migrate the live save/schema, and reconcile the first playtest character state with the new authoritative fields.
-2. Move the RPG runtime, private campaign material, and single-user SQLite save from the home PC to Karin Cloud so normal play no longer depends on the home PC being powered on.
-3. Validate the normal ChatGPT plugin path against the Karin Cloud-hosted runtime, then resume the private playtest.
-4. Capture any new playtest findings without adding campaign spoilers to tracked docs.
-5. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
+1. Refresh/reconnect the ChatGPT Karin Cloud plugin so its cached tool schema includes the newly added `rpg.*` capabilities.
+2. Validate one normal ChatGPT-plugin RPG call against the cloud-hosted runtime, then resume the private playtest with the Home PC optional/offline.
+3. Capture any new playtest findings without adding campaign spoilers to tracked docs.
+4. Define the first compact ChatGPT-DM tool surface exposed by Gateway.
 
