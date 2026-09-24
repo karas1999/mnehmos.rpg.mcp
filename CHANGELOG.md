@@ -119,3 +119,39 @@ The private campaign loaded successfully into the live RPG database and is
 ready for player-character creation and the first session. No DM-only campaign
 content is stored in tracked project files.
 
+## 2026-09-24 - First Solo Playtest Rule Hardening
+
+### Why
+
+The first live solo session exposed several places where the engine's narrated
+5e behavior was looser than its authoritative persisted mechanics. Those gaps
+needed to be fixed before moving the always-on runtime and campaign save to
+Karin Cloud.
+
+### What
+
+- Replaced the hard-coded d8 short-rest die with source-backed class Hit Dice.
+- Persisted available Hit Dice in character resource pools, enforced spending,
+  restored the correct amount on long rests, and grew the pool on level-up.
+- Made Help, Dodge, and Ready consume actions and persist their mechanical
+  effects across encounter reloads.
+- Added a legal two-weapon off-hand Bonus Action attack path and structured
+  advantage/disadvantage attack-roll output.
+- Added nonlethal melee knockout semantics that leave a 0-HP target stable.
+- Auto-equipped unambiguous defensive starter gear and centralized AC
+  calculation so character creation and later equipment changes use one rule.
+- Canonicalized starter torches, rations, and waterskins to source-backed SRD
+  items instead of inert name-only placeholders.
+- Made character updates reject unsupported fields instead of silently
+  dropping them, and added behavior updates.
+- Added generic persisted `featureChoices` for choices such as Ranger Favored
+  Enemy and Natural Explorer, including Campaign Pack support.
+
+### Result
+
+`npm run build` succeeds. The full suite reports 151 test files passed and 1
+skipped, with 2302 tests passed and 7 skipped.
+
+The code is ready to be deployed and the first playtest save reconciled before
+the runtime is migrated from the home PC to Karin Cloud.
+

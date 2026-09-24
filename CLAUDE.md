@@ -4,7 +4,7 @@
 
 The reference backend game engine. **37 MCP tools** (32 consolidated action-routed + 5 meta/event) for complete RPG mechanics, including portable Campaign Pack loading via `campaign_manage`, LLM-driven NPCs via `agent_manage`, and the Operator's constraint-perception lens via `perception_manage`.
 **Philosophy:** "LLM describes, engine validates" - Database is source of truth.
-**Status:** Alpha - 2287 tests passing (7 skipped), 151 passing test files (1 skipped), MCP Protocol fully integrated
+**Status:** Alpha - 2302 tests passing (7 skipped), 151 passing test files (1 skipped), MCP Protocol fully integrated
 
 ## Who consumes this engine
 
@@ -33,7 +33,7 @@ npm run build:binaries            # Create standalone executables
 ```
 src/
 ├── server/
-│   ├── consolidated/  # 31 action-routed tool handlers (index.ts = registry)
+│   ├── consolidated/  # 32 action-routed tool handlers (index.ts = registry)
 │   ├── handlers/      # Extracted handler implementations (combat, spatial)
 │   ├── index.ts       # MCP server entry + transport setup
 │   └── meta-tools.ts  # search_tools, load_tool_schema
