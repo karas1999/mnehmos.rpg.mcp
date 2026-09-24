@@ -108,6 +108,26 @@ export const TokenSchema = z.object({
     ac: z.number().optional().describe('Armor Class for auto-resolution'),
     attackDamage: z.string().optional().describe('Default attack damage (e.g., "1d6+2")'),
     attackBonus: z.number().optional().describe('Default attack bonus'),
+    actionUsed: z.boolean().optional(),
+    bonusActionUsed: z.boolean().optional(),
+    reactionUsed: z.boolean().optional(),
+    hasDashed: z.boolean().optional(),
+    hasDisengaged: z.boolean().optional(),
+    dodging: z.boolean().optional(),
+    helpedBy: z.array(z.string()).optional(),
+    readiedAction: z.object({
+        description: z.string(),
+        trigger: z.string(),
+    }).optional(),
+    spellsCast: z.object({
+        action: z.number().optional(),
+        bonus: z.number().optional(),
+        reaction: z.number().optional(),
+    }).optional(),
+    deathSaveSuccesses: z.number().int().min(0).max(3).optional(),
+    deathSaveFailures: z.number().int().min(0).max(3).optional(),
+    isStabilized: z.boolean().optional(),
+    isDead: z.boolean().optional(),
     // Lair-action ownership — must be persisted so loadState can rebuild the
     // LAIR slot in turnOrder (see encounter.repo.ts loadState lookup).
     hasLairActions: z.boolean().optional().describe('Whether this token owns lair actions'),

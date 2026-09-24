@@ -32,7 +32,10 @@ const AttackSchema = z.object({
     attackBonus: z.number().int().optional(),
     dc: z.number().int().optional(),
     damage: z.union([z.number(), z.string()]).optional(),
-    damageType: z.string().optional()
+    damageType: z.string().optional(),
+    attackMode: z.enum(['standard', 'offhand']).optional().default('standard'),
+    attackKind: z.enum(['melee', 'ranged']).optional(),
+    nonlethal: z.boolean().optional().default(false)
 });
 
 const HealSchema = z.object({
@@ -95,8 +98,34 @@ const ReadySchema = z.object({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONTEXT HOLDER
+// ENGINE HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
+
+function getOrLoadCombatEngine(ctx: SessionContext, encounterId: string): CombatEngine | undefined {
+    const sessionKey = `${ctx.sessionId}:${encounterId}`;
+    let engine = getCombatManager().get(sessionKey);
+    if (engine) return engine;
+
+    const persisted = getDomainServices().encounter.loadState(encounterId);
+    if (!persisted) return undefined;
+
+    engine = getCombatManager().get(sessionKey);
+    if (engine) return engine;
+
+    const candidate = new CombatEngine(encounterId);
+    candidate.loadState(persisted);
+    try {
+        getCombatManager().create(sessionKey, candidate);
+        return candidate;
+    } catch {
+        return getCombatManager().get(sessionKey) ?? undefined;
+    }
+}
+
+function persistCombatEngine(encounterId: string, engine: CombatEngine): void {
+    const state = engine.getState();
+    if (state) getDomainServices().encounter.saveState(encounterId, state);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ACTION DEFINITIONS
@@ -115,7 +144,10 @@ const definitions: Record<CombatAction, ActionDefinition> = {
                 attackBonus: params.attackBonus,
                 dc: params.dc,
                 damage: params.damage,
-                damageType: params.damageType
+                damageType: params.damageType,
+                attackMode: params.attackMode,
+                attackKind: params.attackKind,
+                nonlethal: params.nonlethal
             }, ctx);
             return extractResultData(result, 'attack');
         },
@@ -189,39 +221,7 @@ const definitions: Record<CombatAction, ActionDefinition> = {
         schema: DashSchema,
         handler: async (params: z.infer<typeof DashSchema>, ctx?: SessionContext) => {
             if (!ctx) throw new Error('No session context');
-
-            const sessionKey = `${ctx.sessionId}:${params.encounterId}`;
-            let engine = getCombatManager().get(sessionKey);
-
-            // Auto-load from DB if the engine isn't in memory (matches the
-            // pattern in handleExecuteCombatAction). Without this, dash
-            // returned "not found" after a process restart even when the
-            // encounter still existed and other actions worked.
-            //
-            // Race-safe restore (PR #60 reviewer ask): two concurrent
-            // requests can both find the engine missing and both load from
-            // DB. CombatManager.create throws if the key already exists, so
-            // wrap the create in a try/get fallback — the loser of the race
-            // adopts the winner's engine.
-            if (!engine) {
-                const persisted = getDomainServices().encounter.loadState(params.encounterId);
-                if (persisted) {
-                    // Re-check in case another concurrent request restored it
-                    // between our initial get() and now.
-                    engine = getCombatManager().get(sessionKey);
-                    if (!engine) {
-                        const candidate = new CombatEngine(params.encounterId);
-                        candidate.loadState(persisted);
-                        try {
-                            getCombatManager().create(sessionKey, candidate);
-                            engine = candidate;
-                        } catch {
-                            // Lost the race — adopt the engine the winner created.
-                            engine = getCombatManager().get(sessionKey);
-                        }
-                    }
-                }
-            }
+            const engine = getOrLoadCombatEngine(ctx, params.encounterId);
 
             if (!engine) {
                 return {
@@ -239,6 +239,7 @@ const definitions: Record<CombatAction, ActionDefinition> = {
                     message: result.error
                 };
             }
+            persistCombatEngine(params.encounterId, engine);
             return {
                 success: true,
                 actionType: 'dash',
@@ -255,7 +256,11 @@ const definitions: Record<CombatAction, ActionDefinition> = {
         schema: DodgeSchema,
         handler: async (params: z.infer<typeof DodgeSchema>, ctx?: SessionContext) => {
             if (!ctx) throw new Error('No session context');
-            // Dodge grants advantage on DEX saves, attackers have disadvantage
+            const engine = getOrLoadCombatEngine(ctx, params.encounterId);
+            if (!engine) return { error: true, actionType: 'dodge', message: `Encounter ${params.encounterId} not found.` };
+            const result = engine.applyDodge(params.actorId);
+            if (!result.ok) return { error: true, actionType: 'dodge', actorId: params.actorId, message: result.error };
+            persistCombatEngine(params.encounterId, engine);
             return {
                 success: true,
                 actionType: 'dodge',
@@ -271,7 +276,11 @@ const definitions: Record<CombatAction, ActionDefinition> = {
         schema: HelpSchema,
         handler: async (params: z.infer<typeof HelpSchema>, ctx?: SessionContext) => {
             if (!ctx) throw new Error('No session context');
-            // Help grants advantage to an ally's next attack/check
+            const engine = getOrLoadCombatEngine(ctx, params.encounterId);
+            if (!engine) return { error: true, actionType: 'help', message: `Encounter ${params.encounterId} not found.` };
+            const result = engine.applyHelp(params.actorId, params.targetId);
+            if (!result.ok) return { error: true, actionType: 'help', actorId: params.actorId, message: result.error };
+            persistCombatEngine(params.encounterId, engine);
             return {
                 success: true,
                 actionType: 'help',
@@ -288,7 +297,11 @@ const definitions: Record<CombatAction, ActionDefinition> = {
         schema: ReadySchema,
         handler: async (params: z.infer<typeof ReadySchema>, ctx?: SessionContext) => {
             if (!ctx) throw new Error('No session context');
-            // Ready holds an action for a trigger
+            const engine = getOrLoadCombatEngine(ctx, params.encounterId);
+            if (!engine) return { error: true, actionType: 'ready', message: `Encounter ${params.encounterId} not found.` };
+            const result = engine.applyReady(params.actorId, params.readiedAction, params.trigger);
+            if (!result.ok) return { error: true, actionType: 'ready', actorId: params.actorId, message: result.error };
+            persistCombatEngine(params.encounterId, engine);
             return {
                 success: true,
                 actionType: 'ready',
@@ -309,6 +322,15 @@ const definitions: Record<CombatAction, ActionDefinition> = {
 
 function extractResultData(result: McpResponse, actionType: string): Record<string, unknown> {
     const text = result.content[0].text;
+    const combatResultMatch = text.match(/<!-- COMBAT_RESULT_JSON\n([\s\S]*?)\nCOMBAT_RESULT_JSON -->/);
+    let combatResultData: Record<string, unknown> = {};
+    if (combatResultMatch) {
+        try {
+            combatResultData = JSON.parse(combatResultMatch[1]);
+        } catch {
+            combatResultData = {};
+        }
+    }
 
     // Try to extract STATE_JSON
     const stateMatch = text.match(/<!-- STATE_JSON\n([\s\S]*?)\nSTATE_JSON -->/);
@@ -318,8 +340,12 @@ function extractResultData(result: McpResponse, actionType: string): Record<stri
             return {
                 success: true,
                 actionType,
+                ...combatResultData,
                 ...stateData,
-                rawText: text.replace(/<!-- STATE_JSON[\s\S]*?STATE_JSON -->/, '').trim()
+                rawText: text
+                    .replace(/<!-- COMBAT_RESULT_JSON[\s\S]*?COMBAT_RESULT_JSON -->/, '')
+                    .replace(/<!-- STATE_JSON[\s\S]*?STATE_JSON -->/, '')
+                    .trim()
             };
         } catch {
             // Fall through
@@ -390,6 +416,9 @@ Aliases: hit/strike→attack, cast/spell→cast_spell, sprint→dash, evade→do
         dc: z.number().optional().describe('DC for the attack'),
         damage: z.union([z.number(), z.string()]).optional().describe('Damage amount or dice'),
         damageType: z.string().optional().describe('Damage type (fire, slashing, etc.)'),
+        attackMode: z.enum(['standard', 'offhand']).optional().describe('standard uses the Action; offhand uses the Bonus Action after an Attack action'),
+        attackKind: z.enum(['melee', 'ranged']).optional().describe('Required when declaring a nonlethal attack'),
+        nonlethal: z.boolean().optional().describe('For melee attacks, knock a target unconscious and stable instead of normal 0-HP semantics'),
         amount: z.number().optional().describe('Healing amount'),
         spellName: z.string().optional().describe('Spell name'),
         slotLevel: z.number().optional().describe('Spell slot level'),

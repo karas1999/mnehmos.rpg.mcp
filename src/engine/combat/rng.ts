@@ -224,9 +224,25 @@ export class CombatRNG {
      */
     checkDegreeDetailed(
         modifier: number,
-        dc: number
+        dc: number,
+        advantage: boolean = false,
+        disadvantage: boolean = false
     ): CheckResult {
-        const roll = this.rollDie(20);
+        let rolls = [this.rollDie(20)];
+        let rollMode: CheckResult['rollMode'] = 'normal';
+        if (advantage !== disadvantage) {
+            rolls = [rolls[0], this.rollDie(20)];
+            if (advantage) {
+                rollMode = 'advantage';
+            } else {
+                rollMode = 'disadvantage';
+            }
+        }
+        const roll = rollMode === 'advantage'
+            ? Math.max(...rolls)
+            : rollMode === 'disadvantage'
+                ? Math.min(...rolls)
+                : rolls[0];
         const total = roll + modifier;
         const margin = total - dc;
 
@@ -260,6 +276,8 @@ export class CombatRNG {
 
         return {
             roll,
+            rolls,
+            rollMode,
             modifier,
             total,
             dc,
@@ -309,6 +327,8 @@ export class CombatRNG {
  */
 export interface CheckResult {
     roll: number;           // The raw d20 roll (1-20)
+    rolls: number[];        // One roll normally, two when advantage/disadvantage applies
+    rollMode: 'normal' | 'advantage' | 'disadvantage';
     modifier: number;       // The modifier applied
     total: number;          // roll + modifier
     dc: number;             // The DC to beat

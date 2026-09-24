@@ -661,6 +661,10 @@ Examples:
             damage: z.union([z.number(), z.string()]).optional().describe('Damage amount (number) or dice expression (e.g., "1d6+2")'),
             damageType: z.string().optional()
                 .describe('HIGH-002: Damage type (e.g., "fire", "cold", "slashing") for resistance calculation'),
+            attackMode: z.enum(['standard', 'offhand']).optional().default('standard')
+                .describe('standard uses the Action; offhand uses the Bonus Action after an Attack action'),
+            attackKind: z.enum(['melee', 'ranged']).optional(),
+            nonlethal: z.boolean().optional().default(false),
             amount: z.number().int().optional(),
             targetPosition: z.object({ x: z.number(), y: z.number() }).optional()
                 .describe('CRIT-003: Target position for move action'),
@@ -1385,9 +1389,19 @@ export async function handleExecuteCombatAction(args: unknown, ctx: SessionConte
         if (!parsed.targetId) {
             throw new Error('Attack action requires targetId');
         }
+        if (parsed.nonlethal && parsed.attackKind !== 'melee') {
+            throw new Error('Nonlethal attacks require attackKind="melee"');
+        }
+        if (parsed.attackMode === 'offhand' && !actor?.actionUsed) {
+            throw new Error('Off-hand attack requires taking the Attack action first');
+        }
+        if (parsed.attackMode === 'offhand' && (parsed.damage === undefined || parsed.damage === 0)) {
+            throw new Error('Off-hand attack requires explicit weapon damage without the ability modifier');
+        }
 
         // Validate Action Economy
-        const validation = engine.validateActionEconomy(parsed.actorId, 'action');
+        const actionCost = parsed.attackMode === 'offhand' ? 'bonus' : 'action';
+        const validation = engine.validateActionEconomy(parsed.actorId, actionCost);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
@@ -1400,7 +1414,8 @@ export async function handleExecuteCombatAction(args: unknown, ctx: SessionConte
             attackBonus!,
             dc!,
             damage!,
-            parsed.damageType  // HIGH-002: Pass damage type for resistance calculation
+            parsed.damageType,  // HIGH-002: Pass damage type for resistance calculation
+            { nonlethal: parsed.nonlethal }
         );
 
         // Sync HP to character database after attack
@@ -1457,7 +1472,7 @@ export async function handleExecuteCombatAction(args: unknown, ctx: SessionConte
         output = formatAttackResult(result);
         
         // Commit Action Economy
-        engine.commitAction(parsed.actorId, 'action');
+        engine.commitAction(parsed.actorId, actionCost);
 
     } else if (parsed.action === 'heal') {
         if (parsed.amount === undefined) {
@@ -2069,6 +2084,20 @@ export async function handleExecuteCombatAction(args: unknown, ctx: SessionConte
                 healingDone: result.healAmount,
                 hpChanges: Object.keys(hpChanges).length > 0 ? hpChanges : undefined
             });
+        }
+
+        if (result) {
+            const combatResultJson = {
+                attackRoll: result.attackRoll,
+                damage: result.damage,
+                healAmount: result.healAmount,
+                defeated: result.defeated,
+                knockedOut: result.knockedOut,
+                target: result.target,
+                actionResolved: result.success,
+                ...(parsed.action === 'attack' ? { attackMode: parsed.attackMode } : {}),
+            };
+            output += `\n\n<!-- COMBAT_RESULT_JSON\n${JSON.stringify(combatResultJson)}\nCOMBAT_RESULT_JSON -->`;
         }
 
         // Append current state JSON for frontend

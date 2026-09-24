@@ -44,6 +44,9 @@ export interface CombatParticipant {
     // ACTION ECONOMY
     actionUsed?: boolean;          // Has used main Action this turn
     bonusActionUsed?: boolean;     // Has used Bonus Action this turn
+    helpedBy?: string[];            // Help sources granting advantage on the next attack
+    dodging?: boolean;              // Dodge effect lasts until start of this participant's next turn
+    readiedAction?: { description: string; trigger: string };
     spellsCast?: {                 // Track spells cast this turn for Bonus Action Rule
         action?: number;           // Level of spell cast as Action
         bonus?: number;            // Level of spell cast as Bonus Action
@@ -129,6 +132,7 @@ export interface CombatActionResult {
     // Status
     success: boolean;
     defeated: boolean;
+    knockedOut?: boolean;
     message: string;
     detailedBreakdown: string;
 }
@@ -601,7 +605,8 @@ export class CombatEngine {
         attackBonus: number,
         dc: number,
         damage: number | string,
-        damageType?: string  // HIGH-002: Optional damage type for resistance calculation
+        damageType?: string,  // HIGH-002: Optional damage type for resistance calculation
+        options: { nonlethal?: boolean } = {}
     ): CombatActionResult {
         if (!this.state) throw new Error('No active combat');
 
@@ -613,8 +618,12 @@ export class CombatEngine {
 
         const hpBefore = target.hp;
 
-        // Roll with full transparency
-        const attackRoll = this.rng.checkDegreeDetailed(attackBonus, dc);
+        const hasAdvantage = Boolean(actor.helpedBy?.length) || this.attacksAgainstHaveAdvantage(targetId);
+        const hasDisadvantage = Boolean(target.dodging) || this.attacksHaveDisadvantage(actorId);
+
+        // Roll with full transparency. Advantage and disadvantage cancel.
+        const attackRoll = this.rng.checkDegreeDetailed(attackBonus, dc, hasAdvantage, hasDisadvantage);
+        if (actor.helpedBy?.length) actor.helpedBy = [];
 
         let damageDealt = 0;
         let damageModifier: 'immune' | 'resistant' | 'vulnerable' | 'normal' = 'normal';
@@ -645,9 +654,19 @@ export class CombatEngine {
         }
 
         const defeated = target.hp <= 0;
+        const knockedOut = Boolean(defeated && options.nonlethal && attackRoll.isHit);
+        if (knockedOut) {
+            target.isStabilized = true;
+            target.isDead = false;
+            target.deathSaveSuccesses = 0;
+            target.deathSaveFailures = 0;
+        }
 
         // Build detailed breakdown
-        let breakdown = `🎲 Attack Roll: d20(${attackRoll.roll}) + ${attackBonus} = ${attackRoll.total} vs AC ${dc}\n`;
+        const attackDice = attackRoll.rolls.length > 1
+            ? `2d20(${attackRoll.rolls.join(',')}) ${attackRoll.rollMode === 'advantage' ? 'keep high' : 'keep low'} -> ${attackRoll.roll}`
+            : `d20(${attackRoll.roll})`;
+        let breakdown = `🎲 Attack Roll: ${attackDice} + ${attackBonus} = ${attackRoll.total} vs AC ${dc}\n`;
 
         if (attackRoll.isNat20) {
             breakdown += `   ⭐ NATURAL 20!\n`;
@@ -674,7 +693,7 @@ export class CombatEngine {
             breakdown += `\n\n💥 Damage: ${damageDealt}${typeStr}${damageBreakdownStr}${attackRoll.isCrit ? ' (crit)' : ''}${modStr}\n`;
             breakdown += `   ${target.name}: ${hpBefore} → ${target.hp}/${target.maxHp} HP`;
             if (defeated) {
-                breakdown += ` [DEFEATED]`;
+                breakdown += knockedOut ? ` [KNOCKED OUT - STABLE]` : ` [DEFEATED]`;
             }
         }
 
@@ -682,7 +701,7 @@ export class CombatEngine {
         let message = '';
         if (attackRoll.isHit) {
             message = `${attackRoll.isCrit ? 'CRITICAL ' : ''}HIT! ${actor.name} deals ${damageDealt} damage to ${target.name}`;
-            if (defeated) message += ' [DEFEATED]';
+            if (defeated) message += knockedOut ? ' [KNOCKED OUT - STABLE]' : ' [DEFEATED]';
         } else {
             message = `MISS! ${actor.name}'s attack misses ${target.name}`;
         }
@@ -710,6 +729,7 @@ export class CombatEngine {
             damage: damageDealt,
             success: attackRoll.isHit,
             defeated,
+            knockedOut,
             message,
             detailedBreakdown: breakdown
         };
@@ -1038,6 +1058,15 @@ export class CombatEngine {
      * HIGH-003: Reset reaction and disengage status at start of turn
      */
     private resetTurnResources(participant: CombatParticipant): void {
+        if (this.state) {
+            for (const other of this.state.participants) {
+                if (other.helpedBy?.includes(participant.id)) {
+                    other.helpedBy = other.helpedBy.filter((sourceId) => sourceId !== participant.id);
+                }
+            }
+        }
+        participant.dodging = false;
+        participant.readiedAction = undefined;
         participant.reactionUsed = false;
         participant.hasDisengaged = false;
         participant.hasDashed = false;
@@ -1074,6 +1103,45 @@ export class CombatEngine {
         participant.actionUsed = true;
 
         return { ok: true, movementRemaining: participant.movementRemaining };
+    }
+
+    applyDodge(participantId: string): { ok: true } | { ok: false; error: string } {
+        if (!this.state) return { ok: false, error: 'No active combat' };
+        const participant = this.state.participants.find((p) => p.id === participantId);
+        if (!participant) return { ok: false, error: `Participant ${participantId} not found` };
+        const econ = this.validateActionEconomy(participantId, 'action');
+        if (!econ.valid) return { ok: false, error: econ.error || 'Action already used this turn' };
+        participant.dodging = true;
+        this.commitAction(participantId, 'action');
+        return { ok: true };
+    }
+
+    applyHelp(actorId: string, targetId: string): { ok: true } | { ok: false; error: string } {
+        if (!this.state) return { ok: false, error: 'No active combat' };
+        const actor = this.state.participants.find((p) => p.id === actorId);
+        const target = this.state.participants.find((p) => p.id === targetId);
+        if (!actor) return { ok: false, error: `Participant ${actorId} not found` };
+        if (!target) return { ok: false, error: `Participant ${targetId} not found` };
+        const econ = this.validateActionEconomy(actorId, 'action');
+        if (!econ.valid) return { ok: false, error: econ.error || 'Action already used this turn' };
+        target.helpedBy = [...new Set([...(target.helpedBy ?? []), actorId])];
+        this.commitAction(actorId, 'action');
+        return { ok: true };
+    }
+
+    applyReady(
+        participantId: string,
+        description: string,
+        trigger: string
+    ): { ok: true } | { ok: false; error: string } {
+        if (!this.state) return { ok: false, error: 'No active combat' };
+        const participant = this.state.participants.find((p) => p.id === participantId);
+        if (!participant) return { ok: false, error: `Participant ${participantId} not found` };
+        const econ = this.validateActionEconomy(participantId, 'action');
+        if (!econ.valid) return { ok: false, error: econ.error || 'Action already used this turn' };
+        participant.readiedAction = { description, trigger };
+        this.commitAction(participantId, 'action');
+        return { ok: true };
     }
 
     /**

@@ -240,6 +240,86 @@ describe('combat_action consolidated tool', () => {
             const data = parseResult(result);
             expect(data.success).toBe(true);
         });
+
+        it('should allow a legal off-hand attack as a bonus action after the Attack action', async () => {
+            const create = await handleCombatManage({
+                action: 'create',
+                seed: 'offhand-test',
+                participants: [
+                    { id: 'dual-hero', name: 'Dual Hero', initiativeBonus: 10, hp: 30, maxHp: 30, ac: 16 },
+                    { id: 'training-target', name: 'Training Target', initiativeBonus: 1, hp: 30, maxHp: 30, ac: 10, isEnemy: true }
+                ]
+            }, ctx);
+            const encounterId = parseManageResult(create).encounterId;
+
+            await handleCombatAction({
+                action: 'attack', encounterId, actorId: 'dual-hero', targetId: 'training-target',
+                attackBonus: 100, damage: 1
+            }, ctx);
+
+            const offhandData = parseResult(await handleCombatAction({
+                action: 'attack', encounterId, actorId: 'dual-hero', targetId: 'training-target',
+                attackBonus: 100, damage: '1d6', attackMode: 'offhand'
+            }, ctx));
+            expect(offhandData.error).not.toBe(true);
+            expect(offhandData.actionType).toBe('attack');
+            expect(offhandData.attackMode).toBe('offhand');
+
+            const { getCombatManager } = await import('../../../src/server/state/combat-manager.js');
+            const state = getCombatManager().get(`${ctx.sessionId}:${encounterId}`)!.getState()!;
+            expect(state.participants.find(p => p.id === 'dual-hero')?.bonusActionUsed).toBe(true);
+
+            const secondOffhand = parseResult(await handleCombatAction({
+                action: 'attack', encounterId, actorId: 'dual-hero', targetId: 'training-target',
+                attackBonus: 100, damage: '1d6', attackMode: 'offhand'
+            }, ctx));
+            expect(secondOffhand.error).toBe(true);
+            expect(secondOffhand.message).toMatch(/bonus action already used/i);
+        });
+
+        it('should reject an off-hand bonus attack before taking the Attack action', async () => {
+            const result = parseResult(await handleCombatAction({
+                action: 'attack', encounterId: testEncounterId, actorId: 'hero-1', targetId: 'goblin-1',
+                attackBonus: 100, damage: '1d6', attackMode: 'offhand'
+            }, ctx));
+            expect(result.error).toBe(true);
+            expect(result.message).toMatch(/attack action first/i);
+        });
+
+        it('should model a nonlethal melee knockout as stable at 0 HP', async () => {
+            const create = await handleCombatManage({
+                action: 'create',
+                seed: 'nonlethal-test',
+                participants: [
+                    { id: 'subduer', name: 'Subduer', initiativeBonus: 10, hp: 30, maxHp: 30 },
+                    { id: 'victim', name: 'Victim', initiativeBonus: 1, hp: 1, maxHp: 10, isEnemy: true, ac: 10 }
+                ]
+            }, ctx);
+            const encounterId = parseManageResult(create).encounterId;
+
+            const result = parseResult(await handleCombatAction({
+                action: 'attack', encounterId, actorId: 'subduer', targetId: 'victim',
+                attackBonus: 100, damage: 5, attackKind: 'melee', nonlethal: true
+            }, ctx));
+
+            expect(result.success).toBe(true);
+            expect(result.knockedOut).toBe(true);
+            const { getCombatManager } = await import('../../../src/server/state/combat-manager.js');
+            const target = getCombatManager().get(`${ctx.sessionId}:${encounterId}`)!.getState()!
+                .participants.find(p => p.id === 'victim');
+            expect(target?.hp).toBe(0);
+            expect(target?.isStabilized).toBe(true);
+            expect(target?.isDead).not.toBe(true);
+        });
+
+        it('should reject nonlethal ranged attacks', async () => {
+            const result = parseResult(await handleCombatAction({
+                action: 'attack', encounterId: testEncounterId, actorId: 'hero-1', targetId: 'goblin-1',
+                attackBonus: 100, damage: 8, attackKind: 'ranged', nonlethal: true
+            }, ctx));
+            expect(result.error).toBe(true);
+            expect(result.message).toMatch(/nonlethal.*melee/i);
+        });
     });
 
     describe('heal action', () => {
@@ -489,6 +569,22 @@ describe('combat_action consolidated tool', () => {
             expect(data.success).toBe(true);
             expect(data.actionType).toBe('dodge');
             expect(data.effect).toContain('disadvantage');
+            const { getCombatManager } = await import('../../../src/server/state/combat-manager.js');
+            expect(getCombatManager().get(`${ctx.sessionId}:${testEncounterId}`)!.getState()!
+                .participants.find(p => p.id === 'hero-1')?.actionUsed).toBe(true);
+        });
+
+        it('should impose disadvantage on attacks after a persistence round-trip', async () => {
+            await handleCombatAction({ action: 'dodge', encounterId: testEncounterId, actorId: 'hero-1' }, ctx);
+            const { getCombatManager } = await import('../../../src/server/state/combat-manager.js');
+            getCombatManager().clear();
+
+            const attack = parseResult(await handleCombatAction({
+                action: 'attack', encounterId: testEncounterId, actorId: 'goblin-1', targetId: 'hero-1',
+                attackBonus: 3, damage: 1
+            }, ctx));
+            expect(attack.attackRoll.rollMode).toBe('disadvantage');
+            expect(attack.attackRoll.rolls).toHaveLength(2);
         });
 
         it('should accept "evade" alias', async () => {
@@ -517,6 +613,35 @@ describe('combat_action consolidated tool', () => {
             expect(data.success).toBe(true);
             expect(data.actionType).toBe('help');
             expect(data.effect).toContain('advantage');
+        });
+
+        it('should persist Help and grant advantage to the ally next attack', async () => {
+            const create = await handleCombatManage({
+                action: 'create',
+                seed: 'help-advantage-test',
+                participants: [
+                    { id: 'helper', name: 'Helper', initiativeBonus: 20, hp: 20, maxHp: 20 },
+                    { id: 'attacker', name: 'Attacker', initiativeBonus: 10, hp: 20, maxHp: 20 },
+                    { id: 'target', name: 'Target', initiativeBonus: 1, hp: 30, maxHp: 30, ac: 20, isEnemy: true }
+                ]
+            }, ctx);
+            const encounterId = parseManageResult(create).encounterId;
+            await handleCombatAction({ action: 'help', encounterId, actorId: 'helper', targetId: 'attacker' }, ctx);
+
+            const { getCombatManager } = await import('../../../src/server/state/combat-manager.js');
+            expect(getCombatManager().get(`${ctx.sessionId}:${encounterId}`)!.getState()!
+                .participants.find(p => p.id === 'helper')?.actionUsed).toBe(true);
+            getCombatManager().clear();
+
+            const attack = parseResult(await handleCombatAction({
+                action: 'attack', encounterId, actorId: 'attacker', targetId: 'target',
+                attackBonus: 5, damage: 1
+            }, ctx));
+            expect(attack.attackRoll.rollMode).toBe('advantage');
+            expect(attack.attackRoll.rolls).toHaveLength(2);
+
+            const reloaded = getCombatManager().get(`${ctx.sessionId}:${encounterId}`)!.getState()!;
+            expect(reloaded.participants.find(p => p.id === 'attacker')?.helpedBy ?? []).toHaveLength(0);
         });
 
         it('should accept "assist" alias', async () => {
@@ -548,6 +673,14 @@ describe('combat_action consolidated tool', () => {
             expect(data.actionType).toBe('ready');
             expect(data.readiedAction).toBe('Attack with sword');
             expect(data.trigger).toContain('goblin');
+            const { getCombatManager } = await import('../../../src/server/state/combat-manager.js');
+            const actor = getCombatManager().get(`${ctx.sessionId}:${testEncounterId}`)!.getState()!
+                .participants.find(p => p.id === 'hero-1');
+            expect(actor?.actionUsed).toBe(true);
+            expect(actor?.readiedAction).toEqual({
+                description: 'Attack with sword',
+                trigger: 'When the goblin moves closer'
+            });
         });
 
         it('should accept "prepare" alias', async () => {
