@@ -159,6 +159,7 @@ export async function loadCampaignPack(input: unknown, ctx: SessionContext): Pro
                 provisionEquipment: character.provisionEquipment,
                 customEquipment: character.customEquipment,
                 startingGold: character.startingGold,
+                featureChoices: character.featureChoices,
                 applySpeciesAbilityBonuses: false,
             }, ctx);
             const characterId = requireString(created, 'id', `character ${character.ref}`);

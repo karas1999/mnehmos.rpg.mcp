@@ -19,6 +19,7 @@ import { getDb } from '../../storage/index.js';
 import { CharacterRepository } from '../../storage/repos/character.repo.js';
 import {
     CharacterOriginSchema,
+    FeatureChoicesSchema,
     SkillProficiencySchema,
     SaveProficiencySchema,
 } from '../../schema/character.js';
@@ -113,6 +114,7 @@ const CreateSchema = z.object({
     weaponProficiencies: z.array(z.string()).optional(),
     toolProficiencies: z.array(z.string()).optional(),
     languages: z.array(z.string()).optional(),
+    featureChoices: FeatureChoicesSchema.optional(),
     applySpeciesAbilityBonuses: z.boolean().optional().default(true)
         .describe('Apply source species ability bonuses exactly once; set false only when stats already include them'),
     origin: CharacterOriginSchema.optional(),
@@ -160,8 +162,10 @@ const UpdateSchema = z.object({
     removeConditions: z.array(z.string()).optional(),
     background: z.string().optional(),
     alignment: z.string().optional(),
-    origin: CharacterOriginSchema.optional()
-});
+    origin: CharacterOriginSchema.optional(),
+    behavior: z.string().optional(),
+    featureChoices: FeatureChoicesSchema.optional(),
+}).strict();
 
 const ListSchema = z.object({
     action: z.literal('list'),
@@ -386,6 +390,7 @@ export async function handleCreate(args: z.infer<typeof CreateSchema>): Promise<
         weaponProficiencies: args.weaponProficiencies ?? classSource?.weaponProficiencies ?? classData?.weaponProficiencies ?? [],
         toolProficiencies: uniqueStrings(backgroundSource?.toolProficiencies, args.toolProficiencies),
         languages: uniqueStrings(speciesSource?.languages, backgroundSource?.fixedLanguages, args.languages),
+        featureChoices: args.featureChoices ?? {},
         resistances: args.resistances || [],
         vulnerabilities: args.vulnerabilities || [],
         immunities: args.immunities || [],
@@ -547,6 +552,8 @@ async function handleUpdate(args: z.infer<typeof UpdateSchema>): Promise<object>
     if (args.background !== undefined) updateData.background = args.background;
     if (args.alignment !== undefined) updateData.alignment = args.alignment;
     if (args.origin !== undefined) updateData.origin = args.origin;
+    if (args.behavior !== undefined) updateData.behavior = args.behavior;
+    if (args.featureChoices !== undefined) updateData.featureChoices = args.featureChoices;
     if (args.stats !== undefined) updateData.stats = args.stats;
     if (args.cantripsKnown !== undefined) updateData.cantripsKnown = args.cantripsKnown;
     if (args.knownSpells !== undefined) updateData.knownSpells = args.knownSpells;
@@ -885,6 +892,7 @@ Aliases: new/add/spawn->create, fetch/find->get, modify/edit->update`,
         weaponProficiencies: z.array(z.string()).optional(),
         toolProficiencies: z.array(z.string()).optional(),
         languages: z.array(z.string()).optional(),
+        featureChoices: FeatureChoicesSchema.optional().describe('Durable namespaced feature choices, e.g. ranger.favored_enemy'),
         applySpeciesAbilityBonuses: z.boolean().optional(),
         resistances: z.array(z.string()).optional(),
         vulnerabilities: z.array(z.string()).optional(),

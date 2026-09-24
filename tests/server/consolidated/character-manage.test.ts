@@ -218,6 +218,24 @@ describe('character_manage consolidated tool', () => {
             expect(parsed.resourcePools.hit_dice).toMatchObject({ current: 1, max: 1 });
         });
 
+        it('should persist feature choices supplied at character creation', async () => {
+            const created = extractJson((await handleCharacterManage({
+                action: 'create',
+                name: 'Feature Choice Ranger',
+                class: 'Ranger',
+                provisionEquipment: false,
+                featureChoices: {
+                    'ranger.favored_enemy': ['Orcs', 'Goblins'],
+                    'ranger.natural_explorer': 'Forest'
+                }
+            }, ctx)).content[0].text);
+
+            expect(created.featureChoices).toEqual({
+                'ranger.favored_enemy': ['Orcs', 'Goblins'],
+                'ranger.natural_explorer': 'Forest'
+            });
+        });
+
         it('should grow the persistent hit-dice pool on level up', async () => {
             const created = extractJson((await handleCharacterManage({
                 action: 'create',
@@ -511,6 +529,45 @@ describe('character_manage consolidated tool', () => {
             expect(parsed.name).toBe('Updated Name');
             expect(parsed.hp).toBe(15);
             expect(parsed.level).toBe(2);
+        });
+
+        it('should persist behavior and generic class feature choices', async () => {
+            const result = await handleCharacterManage({
+                action: 'update',
+                characterId,
+                behavior: 'Quietly stubborn and observant.',
+                featureChoices: {
+                    'ranger.favored_enemy': ['Orcs', 'Goblins'],
+                    'ranger.natural_explorer': 'Forest'
+                }
+            }, ctx);
+
+            const parsed = extractJson(result.content[0].text);
+            expect(parsed.success).toBe(true);
+            expect(parsed.behavior).toBe('Quietly stubborn and observant.');
+            expect(parsed.featureChoices).toEqual({
+                'ranger.favored_enemy': ['Orcs', 'Goblins'],
+                'ranger.natural_explorer': 'Forest'
+            });
+
+            const fetched = extractJson((await handleCharacterManage({
+                action: 'get',
+                characterId
+            }, ctx)).content[0].text);
+            expect(fetched.behavior).toBe('Quietly stubborn and observant.');
+            expect(fetched.featureChoices).toEqual(parsed.featureChoices);
+        });
+
+        it('should reject unsupported update fields instead of silently dropping them', async () => {
+            const result = await handleCharacterManage({
+                action: 'update',
+                characterId,
+                definitelyNotACharacterField: 'nope'
+            }, ctx);
+
+            const parsed = extractJson(result.content[0].text);
+            expect(parsed.error).toBe('validation_error');
+            expect(JSON.stringify(parsed)).toMatch(/unrecognized|definitelyNotACharacterField/i);
         });
 
         it('should add conditions', async () => {

@@ -5,6 +5,7 @@ import {
     TravelTerrainSchema,
 } from '../schema/spatial.js';
 import { RevealConditionSchema } from '../schema/secret.js';
+import { FeatureChoicesSchema } from '../schema/character.js';
 import { WorldEnvironmentSchema } from '../schema/world.js';
 
 export const CampaignRefSchema = z.string()
@@ -121,6 +122,7 @@ const CampaignCharacterSchema = z.object({
     provisionEquipment: z.boolean().default(false),
     customEquipment: z.array(z.string()).optional(),
     startingGold: z.number().int().min(0).optional(),
+    featureChoices: FeatureChoicesSchema.optional().default({}),
     locationRef: CampaignRefSchema.optional(),
 });
 

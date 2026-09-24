@@ -16,6 +16,14 @@ export const SkillProficiencySchema = z.enum([
 
 export const SaveProficiencySchema = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']);
 
+export const FeatureChoiceValueSchema = z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.array(z.string()),
+]);
+export const FeatureChoicesSchema = z.record(z.string(), FeatureChoiceValueSchema);
+
 export const CurrencySchema = z.object({
     gold: z.number().int().min(0).default(0),
     silver: z.number().int().min(0).default(0),
@@ -128,6 +136,10 @@ export const CharacterSchema = z.object({
         max: z.number(),
         lastRefilledAt: z.string().optional(),
     })).optional().default({}),
+
+    // Generic durable choices made for class/species/background features.
+    // Namespaced keys avoid adding a new DB column for every RPG feature.
+    featureChoices: FeatureChoicesSchema.optional(),
 
     // Skill and Save Proficiencies
     skillProficiencies: z.array(SkillProficiencySchema).optional().default([])

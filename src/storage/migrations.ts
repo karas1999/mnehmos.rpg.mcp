@@ -901,6 +901,12 @@ function runMigrations(db: Database.Database) {
     db.exec(`ALTER TABLE characters ADD COLUMN resource_pools TEXT DEFAULT '{}';`);
   }
 
+  const hasFeatureChoices = charColumns.some(col => col.name === 'feature_choices');
+  if (!hasFeatureChoices) {
+    console.error('[Migration] Adding feature_choices column to characters table');
+    db.exec(`ALTER TABLE characters ADD COLUMN feature_choices TEXT DEFAULT '{}';`);
+  }
+
   // BASTION: background + alignment were accepted by Zod but had no columns —
   // silently dropped on persistence. Add them. See
   // docs/bastion/05-world-brief-vs-tool-surface.md.
