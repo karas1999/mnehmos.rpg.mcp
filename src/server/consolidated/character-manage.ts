@@ -389,6 +389,9 @@ export async function handleCreate(args: z.infer<typeof CreateSchema>): Promise<
         resistances: args.resistances || [],
         vulnerabilities: args.vulnerabilities || [],
         immunities: args.immunities || [],
+        resourcePools: {
+            hit_dice: { current: level, max: level },
+        },
         spellSlots: undefined,
         pactMagicSlots: undefined,
         xp: 0,
@@ -706,6 +709,19 @@ async function handleLevelUp(args: z.infer<typeof LevelUpSchema>): Promise<objec
         level: targetLevel,
         maxHp: (char.maxHp || 0) + hpIncrease,
         hp: (char.hp || 0) + hpIncrease,
+        resourcePools: {
+            ...(char.resourcePools ?? {}),
+            hit_dice: {
+                current: Math.min(
+                    targetLevel,
+                    Math.max(0, char.resourcePools?.hit_dice?.current ?? currentLevel) + levelsGained
+                ),
+                max: targetLevel,
+                ...(char.resourcePools?.hit_dice?.lastRefilledAt
+                    ? { lastRefilledAt: char.resourcePools.hit_dice.lastRefilledAt }
+                    : {}),
+            },
+        },
     };
 
     // Recompute spell slots for the new level. Without this, level_up would
@@ -729,6 +745,7 @@ async function handleLevelUp(args: z.infer<typeof LevelUpSchema>): Promise<objec
         hpProvenance,
         newMaxHp: updates.maxHp ?? char.maxHp,
         spellSlots: updates.spellSlots,
+        resourcePools: updates.resourcePools,
         message: `Leveled up to ${targetLevel}!`
     };
 }

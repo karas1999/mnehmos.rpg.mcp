@@ -13,6 +13,8 @@ import { CharacterRepository } from '../../storage/repos/character.repo.js';
 import { getCombatManager } from '../state/combat-manager.js';
 import { restoreAllSpellSlots, restorePactSlots, getSpellcastingConfig } from '../../engine/magic/spell-validator.js';
 import { createActionRouter, ActionDefinition, McpResponse } from '../../utils/action-router.js';
+import { findOpen5eClass } from '../../content/open5e-catalog.js';
+import type { Character, NPC } from '../../schema/character.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -44,8 +46,20 @@ function rollDie(sides: number): number {
     return Math.floor(Math.random() * sides) + 1;
 }
 
-function getHitDieSize(_characterId: string): number {
-    return 8; // Default to d8, future: look up class
+function getHitDieSize(character: Character | NPC): number {
+    return findOpen5eClass(character.characterClass || 'fighter')?.hitDie ?? 8;
+}
+
+function getHitDicePool(character: Character | NPC): { current: number; max: number; lastRefilledAt?: string } {
+    const max = Math.max(1, character.level);
+    const stored = character.resourcePools?.hit_dice;
+    const storedCurrent = typeof stored?.current === 'number' ? stored.current : max;
+    const current = Math.max(0, Math.min(max, storedCurrent));
+    return {
+        current,
+        max,
+        ...(stored?.lastRefilledAt ? { lastRefilledAt: stored.lastRefilledAt } : {}),
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -85,13 +99,28 @@ async function handleLongRest(args: z.infer<typeof LongRestSchema>): Promise<obj
 
     const hpRestored = character.maxHp - character.hp;
     const newHp = character.maxHp;
+    const hitDice = getHitDicePool(character);
+    const hitDiceRecoveryLimit = Math.max(1, Math.floor(hitDice.max / 2));
+    const hitDiceRecovered = Math.min(hitDiceRecoveryLimit, hitDice.max - hitDice.current);
+    const nextHitDice = {
+        current: hitDice.current + hitDiceRecovered,
+        max: hitDice.max,
+        lastRefilledAt: new Date().toISOString(),
+    };
 
     // Restore spell slots on long rest
     const charClass = character.characterClass || 'fighter';
     const spellConfig = getSpellcastingConfig(charClass);
 
     let spellSlotsRestored: { type: string; slotsRestored?: number; slotLevel?: number; level1?: number; level2?: number; level3?: number; level4?: number; level5?: number } | undefined = undefined;
-    let updatedChar = { ...character, hp: newHp };
+    let updatedChar = {
+        ...character,
+        hp: newHp,
+        resourcePools: {
+            ...(character.resourcePools ?? {}),
+            hit_dice: nextHitDice,
+        },
+    };
 
     if (spellConfig.canCast && character.level >= spellConfig.startLevel) {
         const restoredChar = restoreAllSpellSlots(character);
@@ -128,7 +157,10 @@ async function handleLongRest(args: z.infer<typeof LongRestSchema>): Promise<obj
         maxHp: character.maxHp,
         hpRestored,
         restType: 'long',
-        spellSlotsRestored
+        spellSlotsRestored,
+        hitDiceRecovered,
+        hitDiceRemaining: nextHitDice.current,
+        hitDiceMax: nextHitDice.max,
     };
 }
 
@@ -148,7 +180,12 @@ async function handleShortRest(args: z.infer<typeof ShortRestSchema>): Promise<o
     }
 
     const hitDiceToSpend = args.hitDiceToSpend ?? 1;
-    const hitDieSize = getHitDieSize(args.characterId);
+    const hitDieSize = getHitDieSize(character);
+    const hitDice = getHitDicePool(character);
+    if (hitDiceToSpend > hitDice.current) {
+        const noun = hitDice.current === 1 ? 'hit die' : 'hit dice';
+        throw new Error(`${character.name} only has ${hitDice.current} ${noun} remaining (requested ${hitDiceToSpend})`);
+    }
     const conModifier = getAbilityModifier(character.stats.con);
 
     // Roll hit dice for healing
@@ -169,7 +206,17 @@ async function handleShortRest(args: z.infer<typeof ShortRestSchema>): Promise<o
     const spellConfig = getSpellcastingConfig(charClass);
 
     let pactSlotsRestored: { slotsRestored: number; slotLevel: number } | undefined = undefined;
-    let updatedChar: Record<string, unknown> = { hp: newHp };
+    const nextHitDice = {
+        ...hitDice,
+        current: hitDice.current - hitDiceToSpend,
+    };
+    let updatedChar: Record<string, unknown> = {
+        hp: newHp,
+        resourcePools: {
+            ...(character.resourcePools ?? {}),
+            hit_dice: nextHitDice,
+        },
+    };
 
     if (spellConfig.pactMagic && spellConfig.canCast && character.level >= spellConfig.startLevel) {
         const restoredChar = restorePactSlots(character);
@@ -191,6 +238,8 @@ async function handleShortRest(args: z.infer<typeof ShortRestSchema>): Promise<o
         hpRestored: actualHealing,
         hitDiceSpent: hitDiceToSpend,
         hitDieSize: `d${hitDieSize}`,
+        hitDiceRemaining: nextHitDice.current,
+        hitDiceMax: nextHitDice.max,
         conModifier,
         rolls,
         restType: 'short',

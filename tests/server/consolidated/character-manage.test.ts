@@ -214,6 +214,30 @@ describe('character_manage consolidated tool', () => {
             const parsed = extractJson(result.content[0].text);
             // Should have _provisioning info
             expect(parsed._provisioning).toBeDefined();
+            expect(parsed.resourcePools.hit_dice).toMatchObject({ current: 1, max: 1 });
+        });
+
+        it('should grow the persistent hit-dice pool on level up', async () => {
+            const created = extractJson((await handleCharacterManage({
+                action: 'create',
+                name: 'Hit Dice Ranger',
+                class: 'Ranger',
+                level: 1,
+                provisionEquipment: false
+            }, ctx)).content[0].text);
+
+            const leveled = extractJson((await handleCharacterManage({
+                action: 'level_up',
+                characterId: created.id,
+                targetLevel: 3
+            }, ctx)).content[0].text);
+
+            expect(leveled.resourcePools.hit_dice).toMatchObject({ current: 3, max: 3 });
+            const persisted = extractJson((await handleCharacterManage({
+                action: 'get',
+                characterId: created.id
+            }, ctx)).content[0].text);
+            expect(persisted.resourcePools.hit_dice).toMatchObject({ current: 3, max: 3 });
         });
 
         // Regression for issue #45: provisioning ran before character row was

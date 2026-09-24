@@ -57,6 +57,39 @@ describe('rest_manage consolidated tool', () => {
             expect(parsed.hpRestored).toBe(25); // 45 - 20
         });
 
+        it('should restore up to half the character total hit dice, minimum one', async () => {
+            characterRepo.update(characterId, {
+                resourcePools: { hit_dice: { current: 1, max: 5 } }
+            });
+
+            const result = await handleRestManage({
+                action: 'long',
+                characterId
+            }, ctx);
+            const parsed = JSON.parse(result.content[0].text);
+
+            expect(parsed.hitDiceRecovered).toBe(2);
+            expect(parsed.hitDiceRemaining).toBe(3);
+            expect(parsed.hitDiceMax).toBe(5);
+            expect(characterRepo.findById(characterId)?.resourcePools.hit_dice).toMatchObject({
+                current: 3,
+                max: 5
+            });
+        });
+
+        it('should restore one hit die for a level-1 character', async () => {
+            characterRepo.update(characterId, {
+                level: 1,
+                resourcePools: { hit_dice: { current: 0, max: 1 } }
+            });
+
+            const result = await handleRestManage({ action: 'long', characterId }, ctx);
+            const parsed = JSON.parse(result.content[0].text);
+            expect(parsed.hitDiceRecovered).toBe(1);
+            expect(parsed.hitDiceRemaining).toBe(1);
+            expect(parsed.hitDiceMax).toBe(1);
+        });
+
         it('should accept alias "long_rest"', async () => {
             const result = await handleRestManage({
                 action: 'long_rest',
@@ -101,9 +134,45 @@ describe('rest_manage consolidated tool', () => {
             const parsed = JSON.parse(result.content[0].text);
             expect(parsed.restType).toBe('short');
             expect(parsed.hitDiceSpent).toBe(2);
-            expect(parsed.hitDieSize).toBe('d8');
+            expect(parsed.hitDieSize).toBe('d10');
             expect(parsed.rolls).toHaveLength(2);
             expect(parsed.newHp).toBeGreaterThanOrEqual(parsed.previousHp);
+            expect(parsed.hitDiceRemaining).toBe(3);
+            expect(parsed.hitDiceMax).toBe(5);
+        });
+
+        it('should persist spent hit dice and reject overspending', async () => {
+            const first = await handleRestManage({
+                action: 'short',
+                characterId,
+                hitDiceToSpend: 4
+            }, ctx);
+            const parsedFirst = JSON.parse(first.content[0].text);
+            expect(parsedFirst.hitDiceRemaining).toBe(1);
+
+            const second = await handleRestManage({
+                action: 'short',
+                characterId,
+                hitDiceToSpend: 2
+            }, ctx);
+            const parsedSecond = JSON.parse(second.content[0].text);
+            expect(parsedSecond.error).toBe(true);
+            expect(parsedSecond.message).toContain('1 hit die');
+
+            const persisted = characterRepo.findById(characterId);
+            expect(persisted?.resourcePools.hit_dice).toMatchObject({ current: 1, max: 5 });
+        });
+
+        it('should derive a ranger hit die as d10', async () => {
+            characterRepo.update(characterId, { characterClass: 'Ranger' });
+
+            const result = await handleRestManage({
+                action: 'short',
+                characterId,
+                hitDiceToSpend: 1
+            }, ctx);
+            const parsed = JSON.parse(result.content[0].text);
+            expect(parsed.hitDieSize).toBe('d10');
         });
 
         it('should default to 1 hit die', async () => {
