@@ -1,6 +1,7 @@
 import { handleCharacterManage, CharacterManageTool } from '../../../src/server/consolidated/character-manage.js';
 import { getDb, closeDb } from '../../../src/storage/index.js';
 import { CharacterRepository } from '../../../src/storage/repos/character.repo.js';
+import { InventoryRepository } from '../../../src/storage/repos/inventory.repo.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -257,6 +258,30 @@ describe('character_manage consolidated tool', () => {
                 expect(parsed._provisioning.errors, `${klass}: equipment errors leaked`).toBeUndefined();
                 expect(parsed._provisioning.equipmentGranted.length, `${klass}: nothing granted`).toBeGreaterThan(0);
             }
+        });
+
+        it('auto-equips ranger scale mail and provisions canonical usable torches', async () => {
+            const result = await handleCharacterManage({
+                action: 'create',
+                name: 'Ranger Starter',
+                class: 'Ranger',
+                race: 'Human',
+                stats: { str: 10, dex: 15, con: 13, int: 12, wis: 14, cha: 8 },
+            }, ctx);
+            const parsed = extractJson(result.content[0].text);
+            expect(parsed.ac).toBe(16);
+
+            const inventory = new InventoryRepository(getDb(':memory:')).getInventoryWithDetails(parsed.id);
+            const scale = inventory.items.find((entry) => entry.item.name === 'Scale mail');
+            expect(scale).toMatchObject({ equipped: true, slot: 'armor' });
+
+            const torch = inventory.items.find((entry) => entry.item.id === 'open5e-srd-2014-srd_torch');
+            expect(torch?.item.name).toBe('Torch');
+            expect(torch?.quantity).toBe(10);
+            expect((torch?.item.properties as any)?.lightSource).toBeDefined();
+
+            const ration = inventory.items.find((entry) => entry.item.id === 'open5e-srd-2014-srd_rations-1-day');
+            expect(ration?.quantity).toBe(10);
         });
 
         // Regression for issue #44: spell slot array was being read with the

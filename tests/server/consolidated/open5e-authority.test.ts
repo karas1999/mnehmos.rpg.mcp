@@ -138,7 +138,7 @@ describe('pinned Open5e engine authority', () => {
             background: 'Acolyte',
             hp: 12,
             maxHp: 12,
-            ac: 12,
+            ac: 18,
             saveProficiencies: ['str', 'con'],
         });
         expect(created.skillProficiencies).toEqual(expect.arrayContaining(['insight', 'religion']));
@@ -151,6 +151,7 @@ describe('pinned Open5e engine authority', () => {
 
         const inventory = new InventoryRepository(getDb()).getInventoryWithDetails(created.id);
         const chainMail = inventory.items.find((entry) => entry.item.name === 'Chain mail');
+        const shield = inventory.items.find((entry) => entry.item.name === 'Shield');
         expect(chainMail?.item).toMatchObject({
             id: 'open5e-srd-2014-srd_chain-mail',
             type: 'armor',
@@ -162,6 +163,9 @@ describe('pinned Open5e engine authority', () => {
                 },
             },
         });
+        expect(chainMail).toMatchObject({ equipped: true, slot: 'armor' });
+        expect(shield).toMatchObject({ equipped: true, slot: 'offhand' });
+        expect(created._provisioning.equipmentEquipped).toEqual(expect.arrayContaining(['Chain mail', 'Shield']));
 
         const unresolvedChoice = inventory.items.find((entry) => entry.item.name === 'Martial Weapon');
         expect(unresolvedChoice?.item).toMatchObject({

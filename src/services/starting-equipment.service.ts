@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import Database from 'better-sqlite3';
 import { ItemRepository } from '../storage/repos/item.repo.js';
 import { InventoryRepository } from '../storage/repos/inventory.repo.js';
+import { CharacterRepository } from '../storage/repos/character.repo.js';
 import { Item } from '../schema/inventory.js';
 import {
     CLASS_DATA,
@@ -25,9 +26,12 @@ import {
 } from '../data/class-starting-data.js';
 import { findOpen5eItem } from '../content/open5e-catalog.js';
 import { materializeOpen5eItem } from './open5e-item.service.js';
+import { calculateEquippedArmorClass } from './armor-class.service.js';
 
 export interface ProvisioningResult {
     itemsGranted: string[];
+    equipmentEquipped: string[];
+    armorClass?: number;
     spellsGranted: string[];
     cantripsGranted: string[];
     spellSlots: number[] | null;
@@ -51,6 +55,8 @@ export interface ProvisioningOptions {
     customCantrips?: string[];
     /** Exact source item keys granted by a selected background or other origin */
     additionalEquipmentSourceKeys?: string[];
+    /** Keep an explicitly supplied AC instead of deriving it from starter armor. */
+    preserveArmorClass?: boolean;
 }
 
 /**
@@ -65,9 +71,11 @@ export function provisionStartingEquipment(
 ): ProvisioningResult {
     const itemRepo = new ItemRepository(db);
     const invRepo = new InventoryRepository(db);
+    const charRepo = new CharacterRepository(db);
 
     const result: ProvisioningResult = {
         itemsGranted: [],
+        equipmentEquipped: [],
         spellsGranted: [],
         cantripsGranted: [],
         spellSlots: null,
@@ -109,6 +117,54 @@ export function provisionStartingEquipment(
             } catch (err) {
                 result.errors.push(`Failed to grant source item "${sourceKey}": ${(err as Error).message}`);
             }
+        }
+
+        // Defensive starter gear has no tactical hand-choice ambiguity: wear
+        // the best granted body armor and carry the best granted shield.
+        // Weapon hands remain a player/DM decision.
+        const inventory = invRepo.getInventoryWithDetails(characterId);
+        const armorCandidates = inventory.items
+            .filter((entry) => {
+                const props = entry.item.properties as Record<string, unknown> | undefined;
+                if (entry.item.type !== 'armor' || !props) return false;
+                if (typeof props.acBonus === 'number') return false;
+                return typeof props.baseAC === 'number' || typeof props.ac === 'number';
+            })
+            .sort((left, right) => {
+                const l = left.item.properties as Record<string, unknown>;
+                const r = right.item.properties as Record<string, unknown>;
+                const leftBase = typeof l.baseAC === 'number' ? l.baseAC : Number(l.ac ?? 0);
+                const rightBase = typeof r.baseAC === 'number' ? r.baseAC : Number(r.ac ?? 0);
+                return rightBase - leftBase || left.item.name.localeCompare(right.item.name);
+            });
+        const shieldCandidates = inventory.items
+            .filter((entry) => entry.item.type === 'armor'
+                && typeof (entry.item.properties as Record<string, unknown> | undefined)?.acBonus === 'number')
+            .sort((left, right) => {
+                const leftBonus = Number((left.item.properties as Record<string, unknown>).acBonus ?? 0);
+                const rightBonus = Number((right.item.properties as Record<string, unknown>).acBonus ?? 0);
+                return rightBonus - leftBonus || left.item.name.localeCompare(right.item.name);
+            });
+
+        if (armorCandidates[0]) {
+            invRepo.equipItem(characterId, armorCandidates[0].item.id, 'armor');
+            result.equipmentEquipped.push(armorCandidates[0].item.name);
+        }
+        if (shieldCandidates[0]) {
+            invRepo.equipItem(characterId, shieldCandidates[0].item.id, 'offhand');
+            result.equipmentEquipped.push(shieldCandidates[0].item.name);
+        }
+
+        const character = charRepo.findById(characterId);
+        if (character && !options.preserveArmorClass) {
+            const armorClass = calculateEquippedArmorClass(
+                character.stats.dex,
+                invRepo.getInventoryWithDetails(characterId).items,
+            );
+            charRepo.update(characterId, { ac: armorClass });
+            result.armorClass = armorClass;
+        } else if (character) {
+            result.armorClass = character.ac;
         }
 
         // Grant starting gold
@@ -233,6 +289,11 @@ const SOURCE_ITEM_ALIASES: Record<string, string> = {
     'arrows': 'srd_arrow-bow',
     'crossbow bolt': 'srd_crossbow-bolt',
     'crossbow bolts': 'srd_crossbow-bolt',
+    'torch': 'srd_torch',
+    'torches': 'srd_torch',
+    'ration': 'srd_rations-1-day',
+    'rations': 'srd_rations-1-day',
+    'waterskin': 'srd_waterskin',
 };
 
 function parseEquipmentEntry(value: string): { itemName: string; quantity: number } {

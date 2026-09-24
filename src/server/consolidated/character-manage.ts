@@ -418,7 +418,8 @@ export async function handleCreate(args: z.infer<typeof CreateSchema>): Promise<
                 startingGold: args.startingGold ?? (backgroundSource
                     ? backgroundSource.startingCurrencyCopper / 100
                     : undefined),
-                additionalEquipmentSourceKeys: backgroundSource?.startingItemSourceKeys
+                additionalEquipmentSourceKeys: backgroundSource?.startingItemSourceKeys,
+                preserveArmorClass: args.ac !== undefined
             }
         );
 
@@ -435,8 +436,10 @@ export async function handleCreate(args: z.infer<typeof CreateSchema>): Promise<
             : provisioningResult.cantripsGranted || [];
         character.spellSlots = convertSpellSlotsToObject(provisioningResult.spellSlots ?? null);
         character.pactMagicSlots = provisioningResult.pactMagicSlots || undefined;
+        character.ac = provisioningResult.armorClass ?? character.ac;
 
         characterRepo.update(characterId, {
+            ac: character.ac as number,
             knownSpells: character.knownSpells as string[],
             preparedSpells: character.preparedSpells as string[],
             cantripsKnown: character.cantripsKnown as string[],
@@ -492,6 +495,7 @@ export async function handleCreate(args: z.infer<typeof CreateSchema>): Promise<
     if (provisioningResult) {
         response._provisioning = {
             equipmentGranted: provisioningResult.itemsGranted,
+            equipmentEquipped: provisioningResult.equipmentEquipped,
             spellsGranted: provisioningResult.spellsGranted,
             cantripsGranted: provisioningResult.cantripsGranted,
             startingGold: provisioningResult.startingGold,

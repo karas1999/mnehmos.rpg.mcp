@@ -5,13 +5,13 @@
 
 import { z } from 'zod';
 import { createActionRouter, ActionDefinition, McpResponse } from '../../utils/action-router.js';
-import type { InventoryRepository } from '../../storage/repos/inventory.repo.js';
 import { CustomEffectsRepository } from '../../storage/repos/custom-effects.repo.js';
 import { INVENTORY_LIMITS } from '../../schema/inventory.js';
 import { getDomainServices } from '../domain-services.js';
 import { SessionContext } from '../types.js';
 import { RichFormatter } from '../utils/formatter.js';
 import { getLightSourceProfile } from '../../services/light-source.service.js';
+import { calculateEquippedArmorClass } from '../../services/armor-class.service.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -33,45 +33,6 @@ function ensureDb() {
         charRepo: services.character,
         effectsRepo: new CustomEffectsRepository(services.db),
     };
-}
-
-/**
- * Rebuild AC from the character's currently equipped armor instead of
- * incrementally adding/subtracting bonuses. Older starter items persisted
- * their armor base as `ac`; newer/authored items may use `baseAC`.
- */
-function equippedArmorClass(
-    dexterity: number,
-    items: ReturnType<InventoryRepository['getInventoryWithDetails']>['items']
-): number {
-    const dexMod = Math.floor((dexterity - 10) / 2);
-    let armorBase = 10 + dexMod;
-    let equipmentBonus = 0;
-
-    for (const entry of items) {
-        if (!entry.equipped || !entry.item.properties) continue;
-        const props = entry.item.properties as Record<string, unknown>;
-        if (typeof props.acBonus === 'number') equipmentBonus += props.acBonus;
-
-        const baseAC = typeof props.baseAC === 'number'
-            ? props.baseAC
-            : typeof props.ac === 'number'
-                ? props.ac
-                : null;
-        if (baseAC === null || entry.slot !== 'armor') continue;
-
-        // Legacy heavy starter armor has no explicit maxDexBonus, but does
-        // carry a Strength requirement. Heavy armor never adds Dexterity.
-        const maxDexBonus = typeof props.maxDexBonus === 'number'
-            ? props.maxDexBonus
-            : typeof props.strengthRequired === 'number'
-                ? 0
-                : Number.POSITIVE_INFINITY;
-        const dexContribution = maxDexBonus === 0 ? 0 : Math.min(dexMod, maxDexBonus);
-        armorBase = Math.max(armorBase, baseAC + dexContribution);
-    }
-
-    return armorBase + equipmentBonus;
 }
 
 function allowedEquipSlots(item: {
@@ -548,7 +509,7 @@ const definitions: Record<InventoryAction, ActionDefinition> = {
             let acChange: string | null = null;
 
             if (character) {
-                const newAc = equippedArmorClass(character.stats.dex, inventoryRepo.getInventoryWithDetails(params.characterId).items);
+                const newAc = calculateEquippedArmorClass(character.stats.dex, inventoryRepo.getInventoryWithDetails(params.characterId).items);
                 if (newAc !== character.ac) charRepo.update(params.characterId, { ac: newAc });
                 acChange = `AC recalculated from equipped armor (now ${newAc})`;
             }
@@ -581,7 +542,7 @@ const definitions: Record<InventoryAction, ActionDefinition> = {
             let acChange: string | null = null;
 
             if (character) {
-                const newAc = equippedArmorClass(character.stats.dex, inventoryRepo.getInventoryWithDetails(params.characterId).items);
+                const newAc = calculateEquippedArmorClass(character.stats.dex, inventoryRepo.getInventoryWithDetails(params.characterId).items);
                 if (newAc !== character.ac) charRepo.update(params.characterId, { ac: newAc });
                 acChange = `AC recalculated from equipped armor (now ${newAc})`;
             }
